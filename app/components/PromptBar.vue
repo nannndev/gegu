@@ -11,15 +11,15 @@ const hotkeys = ['A', 'B', 'C', 'D']
 
 function choiceClass(choice: RegionItem) {
   if (!answered.value) {
-    return 'border-white/10 bg-slate-900/80 text-slate-200 hover:border-sky-400 hover:bg-slate-800'
+    return 'border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-100 hover:border-sky-500/60 hover:bg-sky-50/50 dark:hover:bg-slate-800 shadow-sm'
   }
   if (choice.id === game.currentTarget?.id) {
-    return 'border-emerald-500 bg-emerald-950/60 text-emerald-200 font-semibold shadow-lg shadow-emerald-500/10'
+    return 'border-emerald-500/80 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/30'
   }
   if (choice.id === game.lastAnswerId) {
-    return 'border-rose-500 bg-rose-950/60 text-rose-200'
+    return 'border-rose-500/80 bg-rose-500/15 text-rose-700 dark:text-rose-300 font-semibold ring-1 ring-rose-500/30'
   }
-  return 'border-white/5 bg-slate-950/40 text-slate-600 opacity-60'
+  return 'border-slate-200/50 dark:border-white/5 bg-slate-100/40 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600 opacity-50'
 }
 
 // Keyboard shortcuts for Mode B: A, B, C, D or 1, 2, 3, 4
@@ -48,24 +48,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
-/**
- * Mode campuran berganti level tiap ronde, jadi pemain harus diberi tahu
- * tingkat apa yang sedang ditanyakan — tanpa itu "Malang" ambigu antara
- * kabupaten dan kecamatan.
- */
-const mixedLevelLabel = computed(() => {
-  const level = game.currentTarget?.level
-  if (level === 'district') return 'Kecamatan'
-  if (level === 'country') return 'Kabupaten / Kota'
-  return 'Provinsi'
-})
-
-const isMixed = computed(() => game.datasetScope === 'id-mixed')
-
 const challengeBadge = computed(() => {
-  if (isMixed.value) {
-    return `Campuran · ${mixedLevelLabel.value}`
-  }
   if (game.datasetScope === 'id-kecamatan') {
     return `${game.cityName || 'Kota'} · Kecamatan`
   }
@@ -79,52 +62,43 @@ const challengeBadge = computed(() => {
 })
 
 const modeAInstruction = computed(() => {
-  if (isMixed.value) {
-    const level = game.currentTarget?.level
-    if (level === 'district') return `Klik Kecamatan ${game.currentTarget?.name} di peta.`
-    if (level === 'country') return `Klik ${game.currentTarget?.name} di peta Indonesia.`
-    return `Klik Provinsi ${game.currentTarget?.name} di peta Indonesia.`
-  }
   if (game.datasetScope === 'id-kecamatan') {
-    return `Cari Kecamatan ${game.currentTarget?.name}, terus klik areanya.`
+    return `Cari Kecamatan ${game.currentTarget?.name}, lalu klik wilayahnya di peta.`
   }
   if (game.datasetScope === 'id-kabupaten') {
-    return `Cari ${game.currentTarget?.name}, terus klik areanya.`
+    return `Cari ${game.currentTarget?.name}, lalu klik wilayahnya di peta.`
   }
   if (game.datasetScope === 'id-provinces') {
-    return 'Klik provinsi ini di peta Indonesia.'
+    return 'Klik batas provinsi ini di peta Indonesia.'
   }
   return 'Klik negara ini di peta dunia.'
 })
 
 const modeBQuestion = computed(() => {
-  if (isMixed.value) {
-    return `Yang disorot kuning itu ${mixedLevelLabel.value} apa?`
-  }
   if (game.datasetScope === 'id-kecamatan') {
-    return `Kecamatan apa yang lagi disorot di ${game.cityName || 'kota ini'}?`
+    return `Kecamatan mana yang sedang disorot di ${game.cityName || 'kota ini'}?`
   }
   if (game.datasetScope === 'id-kabupaten') {
-    return `Kab/kota apa yang lagi disorot di ${game.provinceName || 'wilayah ini'}?`
+    return `Wilayah mana yang sedang disorot di ${game.provinceName || 'provinsi ini'}?`
   }
   if (game.datasetScope === 'id-provinces') {
-    return 'Provinsi apa yang lagi disorot?'
+    return 'Provinsi mana yang sedang disorot di peta?'
   }
-  return 'Wilayah apa yang lagi disorot?'
+  return 'Negara mana yang sedang disorot di peta?'
 })
 </script>
 
 <template>
-  <div class="rounded-2xl border border-white/15 bg-slate-950/88 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-5">
-    <!-- Mode A: Locate Country / Province / City on Map -->
+  <div class="raycast-card rounded-2xl p-4 sm:p-5 shadow-2xl">
+    <!-- Mode A: Find on Map -->
     <template v-if="game.mode === 'A'">
-      <div class="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
+      <div class="flex items-center justify-between border-b border-slate-200/80 dark:border-white/10 pb-2.5">
         <div class="flex items-center gap-2">
           <span
             class="inline-flex h-2 w-2 rounded-full animate-pulse"
-            :class="game.datasetScope === 'world' ? 'bg-sky-400' : isMixed ? 'bg-violet-400' : 'bg-rose-400'"
+            :class="game.datasetScope === 'world' ? 'bg-sky-500' : 'bg-rose-500'"
           />
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ challengeBadge }}
           </span>
         </div>
@@ -132,11 +106,11 @@ const modeBQuestion = computed(() => {
         <div class="flex items-center gap-2">
           <span
             v-if="game.currentTarget"
-            class="rounded-md border border-white/10 bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-300"
+            class="rounded-md border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
           >
             {{ game.currentTarget.region }}
           </span>
-          <span class="font-mono text-[11px] font-bold text-sky-400">
+          <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
             +{{ game.nextPoints }} pts
           </span>
         </div>
@@ -148,11 +122,11 @@ const modeBQuestion = computed(() => {
             <span class="text-2xl select-none" aria-hidden="true">
               {{ game.datasetScope === 'world' ? (isoToFlag(game.currentTarget?.iso) || '🌐') : '🇮🇩' }}
             </span>
-            <h2 class="text-xl sm:text-2xl font-black text-white drop-shadow-sm">
+            <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white drop-shadow-sm">
               {{ game.currentTarget?.name }}
             </h2>
           </div>
-          <p class="mt-1 text-xs text-slate-300">
+          <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">
             {{ modeAInstruction }}
           </p>
         </div>
@@ -161,19 +135,19 @@ const modeBQuestion = computed(() => {
 
     <!-- Mode B: Multiple Choice from Highlighted Outline -->
     <template v-else>
-      <div class="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
+      <div class="flex items-center justify-between border-b border-slate-200/80 dark:border-white/10 pb-2.5">
         <div class="flex items-center gap-2">
-          <span class="inline-flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+          <span class="inline-flex h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+          <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
             {{ challengeBadge }}
           </span>
         </div>
-        <span class="font-mono text-[11px] font-bold text-amber-400">
+        <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
           +{{ game.nextPoints }} pts
         </span>
       </div>
 
-      <p class="mt-2.5 text-sm font-semibold text-white sm:text-base">
+      <p class="mt-2.5 text-sm font-bold text-slate-900 dark:text-white sm:text-base">
         {{ modeBQuestion }}
       </p>
 
@@ -198,15 +172,15 @@ const modeBQuestion = computed(() => {
 
           <span
             v-if="answered && choice.id === game.currentTarget?.id"
-            class="shrink-0 text-emerald-400 font-bold text-xs"
+            class="shrink-0 text-emerald-600 dark:text-emerald-400 font-bold text-xs"
           >
-            Benar
+            ✓ Benar
           </span>
           <span
             v-else-if="answered && choice.id === game.lastAnswerId"
-            class="shrink-0 text-rose-400 font-bold text-xs"
+            class="shrink-0 text-rose-600 dark:text-rose-400 font-bold text-xs"
           >
-            Meleset
+            ✗ Meleset
           </span>
         </button>
       </div>

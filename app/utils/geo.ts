@@ -35,37 +35,42 @@ export function getRegionColor(region: string): { bg: string; text: string; bord
 }
 
 /**
- * Evaluates game performance and assigns a clean cartographic tier and description.
+ * Evaluates game performance and assigns a cartographic tier in Indonesian,
+ * matching the game's UI language.
  */
 export function getPerformanceRank(accuracy: number, score: number) {
   if (accuracy >= 90 && score >= 120) {
     return {
-      title: 'Grand Cartographer',
-      badge: 'Tier 1 • Master',
-      desc: 'Exceptional geographic precision across global borders.',
+      title: 'Kartografer Agung',
+      badge: 'Tier 1 · Master',
+      desc: 'Presisi geografis luar biasa — kamu hafal peta sampai ke detail kecil.',
+      icon: '🏆',
       textColor: 'text-zinc-100',
     }
   }
   if (accuracy >= 75) {
     return {
-      title: 'Global Navigator',
-      badge: 'Tier 2 • Expert',
-      desc: 'Strong spatial orientation across multiple continents.',
+      title: 'Navigator Global',
+      badge: 'Tier 2 · Expert',
+      desc: 'Orientasi spasial yang kuat lintas benua dan wilayah.',
+      icon: '🌍',
       textColor: 'text-zinc-100',
     }
   }
   if (accuracy >= 50) {
     return {
-      title: 'World Explorer',
-      badge: 'Tier 3 • Explorer',
-      desc: 'Solid grasp of global territories with room to expand.',
+      title: 'Penjelajah Dunia',
+      badge: 'Tier 3 · Explorer',
+      desc: 'Pemahaman peta yang solid, tinggal diasah biar makin tajam.',
+      icon: '🧭',
       textColor: 'text-zinc-200',
     }
   }
   return {
-    title: 'Apprentice Scout',
-    badge: 'Tier 4 • Cadet',
-    desc: 'Keep practicing to master sovereign nations and territories.',
+    title: 'Kadet Penjelajah',
+    badge: 'Tier 4 · Kadet',
+    desc: 'Terus latihan, batas wilayah dunia makin hafal tiap main.',
+    icon: '🗺️',
     textColor: 'text-zinc-300',
   }
 }

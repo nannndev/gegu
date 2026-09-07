@@ -233,6 +233,7 @@ export const useGameStore = defineStore('game', () => {
     mode,
     datasetScope,
     provinceName,
+    cityName,
     regionFilter,
     timerEnabled,
     score,

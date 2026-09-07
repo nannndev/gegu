@@ -174,57 +174,59 @@ function confirmQuit() {
 
       <button
         type="button"
-        class="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/90 px-2.5 py-1 text-xs font-medium text-zinc-400 shadow-sm backdrop-blur-md transition hover:bg-zinc-800 hover:text-zinc-100 active:scale-95"
+        class="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-sm backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
         @click="showExitModal = true"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
         <span>Keluar</span>
-        <kbd class="hidden sm:inline-block rounded border border-zinc-700 bg-zinc-800 px-1 py-0.2 font-mono text-[9px] text-zinc-400">
+        <span class="shadcn-kbd text-[10px] hidden sm:inline-flex">
           Esc
-        </kbd>
+        </span>
       </button>
     </div>
 
     <!-- Bottom Action Card -->
     <div class="pointer-events-none absolute inset-x-0 bottom-0 z-[1100] space-y-3 p-3 sm:p-5">
       <div class="pointer-events-auto mx-auto w-full max-w-xl">
-        <FeedbackToast v-if="game.phase === 'answered'" @next="next" />
-        <PromptBar v-else @answer="onChoice" />
+        <Transition name="card-pop" mode="out-in">
+          <FeedbackToast v-if="game.phase === 'answered'" key="feedback" @next="next" />
+          <PromptBar v-else key="prompt" @answer="onChoice" />
+        </Transition>
       </div>
     </div>
 
-    <!-- Exit Confirmation Modal (shadcn Dialog style) -->
+    <!-- Exit Confirmation Modal -->
     <Transition
       enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0"
+      enter-from-class="opacity-0 scale-95"
       leave-active-class="transition duration-100 ease-in"
-      leave-to-class="opacity-0"
+      leave-to-class="opacity-0 scale-95"
     >
       <div
         v-if="showExitModal"
-        class="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        class="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
         @click.self="showExitModal = false"
       >
-        <div class="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
-          <h3 class="text-base font-semibold text-zinc-100">Keluar dari sesi?</h3>
-          <p class="mt-2 text-xs text-zinc-400 leading-relaxed">
-            Ronde ini berhenti dan skor sesi nggak disimpan.
+        <div class="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+          <h3 class="font-display text-base font-bold text-slate-900 dark:text-white">Keluar dari sesi?</h3>
+          <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            Ronde ini berhenti dan skor sesi tidak akan disimpan.
           </p>
 
           <div class="mt-6 flex items-center justify-end gap-2">
             <button
               type="button"
-              class="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
+              class="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium text-slate-700 dark:text-slate-300 transition hover:bg-slate-200 dark:hover:bg-slate-700"
               @click="showExitModal = false"
             >
               Lanjut main
             </button>
             <button
               type="button"
-              class="inline-flex h-8 items-center justify-center rounded-lg bg-red-600 px-3 text-xs font-medium text-white transition hover:bg-red-700 active:scale-95"
+              class="inline-flex h-8 items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-500 px-3 text-xs font-medium text-white transition active:scale-95 shadow-sm"
               @click="confirmQuit"
             >
               Keluar

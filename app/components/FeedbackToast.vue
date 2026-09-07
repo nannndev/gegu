@@ -39,18 +39,18 @@ onBeforeUnmount(() => {
 <template>
   <div
     v-if="fb"
-    class="flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl shadow-black/40 backdrop-blur-md transition-all sm:flex-row sm:items-center"
+    class="flex flex-col justify-between gap-3 rounded-2xl border bg-white/95 dark:bg-slate-900/95 p-4 shadow-2xl shadow-black/10 dark:shadow-black/50 backdrop-blur-md transition-all sm:flex-row sm:items-center"
     :class="fb.kind === 'correct'
-      ? 'border-emerald-400/30 bg-slate-950/92'
-      : 'border-red-400/30 bg-slate-950/92'"
+      ? 'border-emerald-500/40'
+      : 'border-rose-500/40'"
   >
     <div class="flex items-start gap-3 min-w-0">
       <!-- Status Icon -->
       <div
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm"
         :class="fb.kind === 'correct'
-          ? 'border-emerald-400/40 bg-emerald-950/70 text-emerald-300'
-          : 'border-red-400/40 bg-red-950/70 text-red-300'"
+          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+          : 'border-rose-500/50 bg-rose-500/15 text-rose-600 dark:text-rose-400'"
       >
         <svg v-if="fb.kind === 'correct'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12" />
@@ -65,38 +65,48 @@ onBeforeUnmount(() => {
         </svg>
       </div>
 
-      <div class="min-w-0 flex-1">
-        <h3
-          class="text-sm font-semibold tracking-tight"
-          :class="fb.kind === 'correct' ? 'text-emerald-400' : 'text-red-400'"
-        >
-          {{ headline }}
-        </h3>
+      <div class="min-w-0 flex-1" aria-live="polite">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3
+            class="font-display text-sm font-bold tracking-tight"
+            :class="fb.kind === 'correct' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
+          >
+            {{ headline }}
+          </h3>
+          <span
+            class="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+            :class="fb.kind === 'correct'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
+          >
+            Ronde {{ game.currentRound }} / {{ game.totalRounds }}
+          </span>
+        </div>
 
-        <p class="mt-0.5 text-xs text-zinc-300">
+        <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
           <template v-if="fb.kind === 'correct'">
-            Yup, itu {{ fb.targetName }}.
+            Yup, tepat sekali! Itu {{ fb.targetName }}.
           </template>
           <template v-else>
-            <span v-if="fb.answerName" class="text-zinc-400">
-              Kamu pilih <span class="text-zinc-200 line-through">{{ fb.answerName }}</span>.
+            <span v-if="fb.answerName" class="text-slate-500 dark:text-slate-400">
+              Kamu pilih <span class="text-slate-700 dark:text-slate-300 line-through">{{ fb.answerName }}</span>.
             </span>
             <span>
-              Yang bener <strong class="text-zinc-100">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
+              Yang benar adalah <strong class="text-slate-900 dark:text-white font-semibold">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
             </span>
           </template>
         </p>
       </div>
     </div>
 
-    <!-- Action Button (shadcn button) -->
+    <!-- Action Button -->
     <button
       type="button"
-      class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-4 text-xs font-bold text-slate-950 transition hover:bg-slate-200 active:scale-98"
+      class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-slate-900 dark:bg-white px-4 text-xs font-bold text-white dark:text-slate-950 transition hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 shadow-md"
       @click="emit('next')"
     >
       <span>{{ isLast ? 'Lihat Skor' : 'Lanjut' }}</span>
-      <kbd class="hidden sm:inline-flex h-4 items-center rounded border border-zinc-300 bg-zinc-200 px-1 font-mono text-[9px] text-zinc-800">
+      <kbd class="hidden h-4 items-center rounded border border-white/20 dark:border-slate-900/20 bg-white/10 dark:bg-slate-900/10 px-1 font-mono text-[9px] text-white dark:text-slate-950 sm:inline-flex">
         Space ↵
       </kbd>
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

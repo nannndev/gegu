@@ -1,6 +1,7 @@
 import type { Map as LeafletMap, GeoJSON, Layer, PathOptions, TileLayer } from 'leaflet'
 import type { RegionCollection, RegionFeature, RegionItem } from '~/types/game'
 import type { MapViewMode } from '~/composables/useMapView'
+import { FLAG_BORDER, flagFillFor } from '~/utils/flagPalette'
 
 export type RegionMark = 'correct' | 'wrong' | 'target'
 
@@ -53,10 +54,40 @@ export function useLeafletMap(
   let geoLayer: GeoJSON | null = null
   let tileLayer: TileLayer | null = null
   const layerById = new Map<string, Layer>()
+  const itemById = new Map<string, RegionItem>()
   const marked = new Set<string>()
 
   function styleFor(layer: Layer, style: PathOptions) {
     ;(layer as unknown as { setStyle: (s: PathOptions) => void }).setStyle(style)
+  }
+
+  /**
+   * Style dasar sebuah wilayah. Scope dunia memakai isian warna bendera
+   * (mode tanpa ubin); mode lain memakai tema polos.
+   */
+  function baseStyleFor(item: RegionItem): PathOptions {
+    const t = theme()
+    const isId = isIdScope(scope.value)
+    const isLocalMode = isLocalScope(scope.value)
+    const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
+
+    if (isLocalMode) {
+      return isTargetPool ? { ...t.activeLocal } : { ...t.contextLocal }
+    }
+    if (isId) return { ...t.baseId }
+
+    if (t.flagWorld) {
+      const flag = flagFillFor(item.iso ?? item.id)
+      if (flag) {
+        return {
+          fillColor: flag.fill,
+          fillOpacity: 1,
+          color: flag.border ?? FLAG_BORDER,
+          weight: 0.6,
+        }
+      }
+    }
+    return { ...t.baseWorld }
   }
 
   function setupLayers() {
@@ -71,6 +102,7 @@ export function useLeafletMap(
       geoLayer.remove()
       geoLayer = null
       layerById.clear()
+      itemById.clear()
       marked.clear()
     }
 
@@ -129,21 +161,16 @@ export function useLeafletMap(
       style: (feature) => {
         const f = feature as RegionFeature
         const item = toRegionItem(f)
-        const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
-        if (isLocalMode) {
-          return isTargetPool ? { ...t.activeLocal } : { ...t.contextLocal }
-        }
-        return isId ? { ...t.baseId } : { ...t.baseWorld }
+        return baseStyleFor(item)
       },
       onEachFeature: (feature, layer) => {
         const f = feature as RegionFeature
         const item = toRegionItem(f)
         layerById.set(item.id, layer)
+        itemById.set(item.id, item)
 
+        const baseStyle = baseStyleFor(item)
         const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
-        const baseStyle = isLocalMode
-          ? (isTargetPool ? t.activeLocal : t.contextLocal)
-          : (isId ? t.baseId : t.baseWorld)
 
         layer.on({
           mouseover: () => {
@@ -204,27 +231,17 @@ export function useLeafletMap(
     const layer = layerById.get(id)
     if (!layer) return
     marked.add(id)
-    const t = theme()
-    const isId = isIdScope(scope.value)
-    const isLocalMode = isLocalScope(scope.value)
-    const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(id)
-    const baseStyle = isLocalMode
-      ? (isTargetPool ? t.activeLocal : t.contextLocal)
-      : (isId ? t.baseId : t.baseWorld)
-    styleFor(layer, { ...baseStyle, ...t.mark[kind] })
+    const item = itemById.get(id)
+    const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
+    styleFor(layer, { ...baseStyle, ...theme().mark[kind] })
     ;(layer as unknown as { bringToFront: () => void }).bringToFront()
   }
 
   function resetStyles() {
     marked.clear()
-    const t = theme()
-    const isId = isIdScope(scope.value)
-    const isLocalMode = isLocalScope(scope.value)
     for (const [id, layer] of layerById.entries()) {
-      const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(id)
-      const baseStyle = isLocalMode
-        ? (isTargetPool ? t.activeLocal : t.contextLocal)
-        : (isId ? t.baseId : t.baseWorld)
+      const item = itemById.get(id)
+      const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
       styleFor(layer, { ...baseStyle })
     }
   }
@@ -362,6 +379,7 @@ export function useLeafletMap(
     geoLayer = null
     tileLayer = null
     layerById.clear()
+    itemById.clear()
     marked.clear()
     ready.value = false
   })

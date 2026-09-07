@@ -26,11 +26,11 @@ const props = withDefaults(defineProps<{
   searchPlaceholder?: string
   disabled?: boolean
   /** Warna aksen: menyesuaikan konteks kartu tempat dropdown ini dipakai. */
-  accent?: 'sky' | 'amber' | 'slate'
+  accent?: 'brass' | 'seal' | 'ink'
   /** Sembunyikan kolom cari kalau opsinya sedikit. */
   searchThreshold?: number
 }>(), {
-  accent: 'sky',
+  accent: 'brass',
   searchThreshold: 8,
   placeholder: 'Pilih…',
   searchPlaceholder: 'Cari…',
@@ -44,35 +44,39 @@ const activeIndex = ref(0)
 const rootEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLInputElement | null>(null)
 const listEl = ref<HTMLElement | null>(null)
+/** Kalau ruang di bawah trigger sempit, dropdown dibuka ke atas. */
+const dropUp = ref(false)
+/** Tinggi list dibatasi sisa ruang viewport biar tidak terpotong. */
+const menuMaxHeight = ref(288)
 
 const selected = computed(() => props.options.find(o => o.value === props.modelValue) ?? null)
 const showSearch = computed(() => props.options.length >= props.searchThreshold)
 
 const ACCENTS = {
-  sky: {
-    trigger: 'border-sky-500/40 hover:border-sky-400/70',
-    label: 'text-sky-100',
-    chevron: 'text-sky-300',
-    activeText: 'text-sky-300',
-    focus: 'focus:border-sky-400',
+  brass: {
+    trigger: 'border-slate-200 dark:border-white/10 hover:border-sky-500/50 dark:hover:border-sky-400/50',
+    label: 'text-slate-900 dark:text-slate-100',
+    chevron: 'text-slate-400 dark:text-slate-500',
+    activeText: 'text-sky-600 dark:text-sky-400',
+    focus: 'focus:border-sky-500 dark:focus:border-sky-400',
   },
-  amber: {
-    trigger: 'border-amber-500/40 hover:border-amber-400/70',
-    label: 'text-amber-100',
-    chevron: 'text-amber-300',
-    activeText: 'text-amber-300',
-    focus: 'focus:border-amber-400',
+  seal: {
+    trigger: 'border-slate-200 dark:border-white/10 hover:border-rose-500/50 dark:hover:border-rose-400/50',
+    label: 'text-slate-900 dark:text-slate-100',
+    chevron: 'text-slate-400 dark:text-slate-500',
+    activeText: 'text-rose-600 dark:text-rose-400',
+    focus: 'focus:border-rose-500 dark:focus:border-rose-400',
   },
-  slate: {
-    trigger: 'border-white/10 hover:border-white/20',
-    label: 'text-slate-200',
-    chevron: 'text-slate-400',
-    activeText: 'text-sky-300',
-    focus: 'focus:border-sky-400',
+  ink: {
+    trigger: 'border-slate-200 dark:border-white/10 hover:border-sky-500/50 dark:hover:border-sky-400/50',
+    label: 'text-slate-900 dark:text-slate-100',
+    chevron: 'text-slate-400 dark:text-slate-500',
+    activeText: 'text-sky-600 dark:text-sky-400',
+    focus: 'focus:border-sky-500 dark:focus:border-sky-400',
   },
 } as const
 
-const accent = computed(() => ACCENTS[props.accent])
+const accent = computed(() => ACCENTS[props.accent] ?? ACCENTS.brass)
 
 /** Peringkat: awalan label > mengandung label > mengandung grup/hint. */
 const results = computed(() => {
@@ -111,9 +115,15 @@ watch(results, () => { activeIndex.value = 0 })
 function openMenu() {
   if (props.disabled) return
   open.value = true
-  // Mulai dari opsi yang sedang terpilih supaya keyboard terasa wajar.
   activeIndex.value = Math.max(0, results.value.findIndex(o => o.value === props.modelValue))
   nextTick(() => {
+    const el = rootEl.value
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      const below = window.innerHeight - rect.bottom
+      dropUp.value = below < 240
+      menuMaxHeight.value = Math.max(160, Math.min(288, (dropUp.value ? rect.top - 8 : below) - 8))
+    }
     inputEl.value?.focus()
     scrollActiveIntoView()
   })
@@ -179,7 +189,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
   <div ref="rootEl" class="relative">
     <button
       type="button"
-      class="focusable flex w-full items-center justify-between gap-2 rounded-lg border bg-slate-950 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
+      class="focusable flex w-full items-center justify-between gap-2 rounded-xl border bg-white/90 dark:bg-slate-900/90 px-3.5 py-2.5 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
       :class="accent.trigger"
       :disabled="disabled"
       :aria-expanded="open"
@@ -189,16 +199,16 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
       @keydown="onKeydown"
     >
       <span class="min-w-0 flex-1">
-        <span class="block truncate text-xs font-semibold" :class="accent.label">
+        <span class="block truncate text-xs font-bold" :class="accent.label">
           {{ selected?.label ?? placeholder }}
         </span>
-        <span v-if="selected?.hint" class="block truncate text-[10px] text-slate-400">
+        <span v-if="selected?.hint" class="block truncate text-[10px] text-slate-500 dark:text-slate-400">
           {{ selected.hint }}
         </span>
       </span>
       <svg
         xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform"
-        :class="[accent.chevron, open ? 'rotate-180' : '']"
+        :class="[accent.chevron, open ? 'rotate-180 text-sky-500' : '']"
         viewBox="0 0 20 20" fill="currentColor"
       >
         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -207,36 +217,41 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
 
     <Transition
       enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0 -translate-y-1"
+      enter-from-class="opacity-0 -translate-y-1 scale-95"
       leave-active-class="transition duration-100 ease-in"
-      leave-to-class="opacity-0"
+      leave-to-class="opacity-0 scale-95"
     >
       <div
         v-if="open"
-        class="absolute z-50 mt-1.5 w-full min-w-56 overflow-hidden rounded-xl border border-white/[0.08] bg-slate-900 shadow-2xl"
+        class="absolute z-50 w-full min-w-56 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-xl"
+        :class="dropUp ? 'bottom-full mb-1.5' : 'mt-1.5'"
       >
-        <div v-if="showSearch" class="border-b border-white/[0.06] p-2">
-          <input
-            ref="inputEl"
-            v-model="query"
-            type="text"
-            :placeholder="searchPlaceholder"
-            :aria-label="searchPlaceholder"
-            class="focusable w-full rounded-lg border border-white/[0.08] bg-slate-950 px-2.5 py-1.5 text-xs text-slate-100 outline-none placeholder:text-slate-500"
-            :class="accent.focus"
-            @keydown="onKeydown"
-          >
+        <div v-if="showSearch" class="border-b border-slate-200/80 dark:border-white/10 p-2.5">
+          <div class="relative">
+            <input
+              ref="inputEl"
+              v-model="query"
+              type="text"
+              :placeholder="searchPlaceholder"
+              :aria-label="searchPlaceholder"
+              class="focusable w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 focus:border-sky-500 dark:focus:border-sky-400"
+              @keydown="onKeydown"
+            >
+            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
+          </div>
         </div>
 
-        <div ref="listEl" role="listbox" class="max-h-72 overflow-y-auto overscroll-contain py-1">
-          <p v-if="!results.length" class="px-3 py-6 text-center text-[11px] text-slate-500">
+        <div ref="listEl" role="listbox" class="overflow-y-auto overscroll-contain py-1" :style="{ maxHeight: `${menuMaxHeight}px` }">
+          <p v-if="!results.length" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
             Tidak ada yang cocok.
           </p>
 
           <template v-for="(g, gi) in grouped" :key="g.group ?? `g${gi}`">
             <p
               v-if="g.group"
-              class="sticky top-0 bg-slate-900/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 backdrop-blur"
+              class="sticky top-0 bg-slate-100/95 dark:bg-slate-800/95 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 backdrop-blur"
             >
               {{ g.group }}
             </p>
@@ -247,23 +262,23 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
               role="option"
               :aria-selected="o.value === modelValue"
               :data-active="indexOf(o) === activeIndex"
-              class="flex w-full items-center gap-2 px-3 py-1.5 text-left transition"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left transition"
               :class="[
-                indexOf(o) === activeIndex ? 'bg-white/[0.07]' : '',
-                o.value === modelValue ? accent.activeText : 'text-slate-200',
+                indexOf(o) === activeIndex ? 'bg-sky-50 dark:bg-sky-950/40' : '',
+                o.value === modelValue ? 'bg-sky-100/80 dark:bg-sky-900/40 font-bold text-sky-700 dark:text-sky-300' : 'text-slate-700 dark:text-slate-200',
               ]"
               @click="choose(o)"
               @mouseenter="activeIndex = indexOf(o)"
             >
-              <span v-if="o.badge" class="w-8 shrink-0 text-[10px] font-medium text-slate-500">{{ o.badge }}</span>
+              <span v-if="o.badge" class="w-8 shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500">{{ o.badge }}</span>
               <span class="min-w-0 flex-1">
-                <span class="block truncate text-[11px] font-medium">{{ o.label }}</span>
-                <span v-if="o.hint" class="block truncate text-[10px] text-slate-500">{{ o.hint }}</span>
+                <span class="block truncate text-xs">{{ o.label }}</span>
+                <span v-if="o.hint" class="block truncate text-[10px] text-slate-500 dark:text-slate-400">{{ o.hint }}</span>
               </span>
-              <span v-if="o.count !== undefined" class="shrink-0 text-[10px] tabular-nums text-slate-500">
+              <span v-if="o.count !== undefined" class="shrink-0 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-slate-600 dark:text-slate-400">
                 {{ o.count }}
               </span>
-              <span v-if="o.value === modelValue" class="shrink-0 text-[10px] font-bold" aria-hidden="true">✓</span>
+              <span v-if="o.value === modelValue" class="shrink-0 text-xs font-bold text-sky-500" aria-hidden="true">✓</span>
             </button>
           </template>
         </div>

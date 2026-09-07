@@ -19,6 +19,7 @@ const {
 } = useGeoData()
 const game = useGameStore()
 const { soundEnabled, toggleSound, playClick } = useAudio()
+const { isDark, toggleTheme } = useTheme()
 
 const primaryScope = ref<'world' | 'indonesia'>('indonesia')
 const indonesiaLevel = ref<'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'>('kecamatan')
@@ -38,10 +39,20 @@ const stats = reactive({
 })
 
 const quickProvinces = ['DKI Jakarta', 'Bali', 'Jawa Barat', 'DI Yogyakarta', 'Jawa Timur', 'Sumatera Utara']
-/** Pintasan kota DKI Jakarta, diambil dari indeks. */
-const quickCities = computed(() =>
-  availableCities.value.filter(c => /^Daerah Khusus/i.test(c.province)),
-)
+
+/** Pintasan kota populer untuk akses 1-klik */
+const quickCities = computed(() => {
+  const dki = availableCities.value.filter(c => /Daerah Khusus|Jakarta/i.test(c.province))
+  if (dki.length) return dki
+  return availableCities.value.slice(0, 5)
+})
+
+const popularMajorCities = computed(() => {
+  const targets = ['Surabaya', 'Bandung', 'Medan', 'Denpasar', 'Semarang', 'Makassar']
+  return availableCities.value.filter(c =>
+    targets.some(t => c.city.toLowerCase().includes(t.toLowerCase())),
+  )
+})
 
 const activeScope = computed<DatasetScope>(() => {
   if (primaryScope.value === 'world') return 'world'
@@ -56,28 +67,12 @@ await load('district', 'id-kecamatan')
 
 /** Provinsi terpilih di mode kecamatan; menyaring daftar kota di bawahnya. */
 const kecamatanProvince = ref(activeKecamatanCity.value?.province ?? 'Daerah Khusus Ibukota Jakarta')
-// Selaraskan state awal dengan kota yang sudah dimuat: koleksi berisi satu kota,
-// jadi seluruh isinya adalah pool soal.
 selectedCity.value = activeKecamatanCity.value?.city ?? ''
 regionFilter.value = 'all'
 selectedRounds.value = Math.min(10, activeKecamatanCity.value?.count ?? 8)
-/** Kata kunci pencarian kota — daftarnya 494 item, terlalu panjang untuk di-scroll. */
-const citySearch = ref('')
-
-/** Kota di provinsi terpilih, disaring pencarian. */
-const citiesInProvince = computed(() => {
-  const query = citySearch.value.trim().toLowerCase()
-  return availableCities.value
-    .filter(c => query
-      ? c.city.toLowerCase().includes(query) || c.province.toLowerCase().includes(query)
-      : c.province === kecamatanProvince.value)
-    .slice(0, query ? 40 : undefined)
-})
 
 /**
  * Pindah provinsi lewat dropdown: muat kota pertama di provinsi itu.
- * Dilewati kalau kota aktif sudah ada di provinsi tersebut — itu berarti
- * provinsinya berubah karena mengikuti pilihan kota, bukan sebaliknya.
  */
 watch(kecamatanProvince, async (prov) => {
   if (activeScope.value !== 'id-kecamatan') return
@@ -102,8 +97,6 @@ async function selectIndonesiaLevel(lvl: 'provinces' | 'kabupaten' | 'kecamatan'
 
 async function syncScope() {
   const scope = activeScope.value
-  // Mode campuran tidak punya satu koleksi tunggal — pool-nya dibangun saat
-  // permainan dimulai, jadi tidak ada scope yang perlu dimuat di sini.
   if (scope !== 'id-mixed') await setScope(scope)
 
   if (scope === 'id-mixed') {
@@ -134,13 +127,12 @@ function selectProvince(prov: string) {
   playClick()
 }
 
-/** Ganti kota: hanya file kota itu yang diunduh. */
+/** Ganti kota: unduh kota spesifik */
 async function selectCity(cityId: string) {
   playClick()
   await setKecamatanCity(cityId)
   selectedCity.value = activeKecamatanCity.value?.city ?? ''
   if (activeKecamatanCity.value) kecamatanProvince.value = activeKecamatanCity.value.province
-  // Koleksi yang dimuat hanya berisi kota ini, jadi seluruh isinya jadi pool.
   regionFilter.value = 'all'
   selectedRounds.value = Math.min(10, poolSize.value || 8)
 }
@@ -162,8 +154,6 @@ watch(selectedProvince, (prov) => {
     selectedRounds.value = Math.min(10, itemsInRegion(prov).length || 5)
   }
 })
-
-
 
 /** Opsi untuk SearchSelect: provinsi di panel kecamatan. */
 const provinceOptions = computed<SearchOption[]>(() =>
@@ -203,7 +193,6 @@ const mixedLevels = ref<{ province: boolean, kabupaten: boolean, kecamatan: bool
   kabupaten: true,
   kecamatan: true,
 })
-/** Berapa kabupaten/kota yang kecamatannya diunduh untuk mode campuran. */
 const mixedCityCount = ref(4)
 const mixedPending = ref(false)
 
@@ -212,13 +201,11 @@ const mixedLevelCount = computed(() =>
 )
 
 function toggleMixedLevel(key: 'province' | 'kabupaten' | 'kecamatan') {
-  // Minimal satu level harus aktif, kalau tidak pool-nya kosong.
   if (mixedLevels.value[key] && mixedLevelCount.value === 1) return
   mixedLevels.value[key] = !mixedLevels.value[key]
   playClick()
 }
 
-/** Perkiraan jumlah soal di mode campuran, tanpa perlu mengunduh datanya. */
 const mixedEstimate = computed(() => {
   let n = 0
   if (mixedLevels.value.province) n += 38
@@ -258,21 +245,20 @@ const activeProvinceExampleCity = computed(() => {
 
 const availableRoundOptions = computed(() => {
   const total = poolSize.value
-  if (total <= 5) return [{ label: `Semua ${total}`, value: total }]
+  if (total <= 5) return [{ label: `Semua (${total})`, value: total }]
   if (total <= 10) {
     return [
       { label: '5', value: 5 },
-      { label: `Semua ${total}`, value: total },
+      { label: `Semua (${total})`, value: total },
     ]
   }
   return [
     { label: '5', value: 5 },
     { label: '10', value: 10 },
-    { label: total <= 20 ? `Semua ${total}` : '20', value: Math.min(20, total) },
+    { label: total <= 20 ? `Semua (${total})` : '20', value: Math.min(20, total) },
   ]
 })
 
-/** Jaga selectedRounds tetap salah satu opsi yang tersedia untuk pool saat ini. */
 watch(availableRoundOptions, (options) => {
   if (!options.length) return
   if (!options.some(o => o.value === selectedRounds.value)) {
@@ -280,7 +266,6 @@ watch(availableRoundOptions, (options) => {
   }
 })
 
-/** Label ringkas untuk panel ringkasan & tombol start. */
 const scopeLabel = computed(() => {
   if (activeScope.value === 'world') {
     return regionFilter.value === 'all' ? 'Seluruh Dunia' : regionFilter.value
@@ -298,7 +283,7 @@ const scopeLabel = computed(() => {
     if (mixedLevels.value.kecamatan) parts.push('Kecamatan')
     return `Campuran · ${parts.join(' + ')}`
   }
-  return `${selectedCity.value} · Kecamatan`
+  return `${selectedCity.value || 'Kota'} · Kecamatan`
 })
 
 const unitLabel = computed(() => {
@@ -322,8 +307,6 @@ async function start() {
 
   let pool: RegionItem[]
   if (activeScope.value === 'id-mixed') {
-    // Pool campuran perlu mengunduh beberapa dataset, jadi tombolnya dikunci
-    // selama proses supaya tidak terpicu dua kali.
     mixedPending.value = true
     try {
       const levels: RegionLevel[] = []
@@ -354,7 +337,6 @@ async function start() {
   navigateTo({ path: '/play', query: { mode: selectedMode.value } })
 }
 
-/** Enter mulai permainan — kecuali fokus sedang di kontrol yang punya aksi Enter sendiri. */
 const INTERACTIVE_TAGS = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SUMMARY', 'A']
 
 function onKeydown(e: KeyboardEvent) {
@@ -378,287 +360,337 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="relative flex min-h-dvh flex-col bg-[#070a12] text-slate-100 selection:bg-sky-500/20 selection:text-sky-200">
-    <!-- Ambient lighting -->
+  <div class="relative flex min-h-dvh flex-col bg-slate-50 dark:bg-[#080b11] text-slate-900 dark:text-slate-100 selection:bg-sky-500/20 selection:text-sky-500 cool-grid-bg transition-colors duration-200">
+    <!-- Ambient glowing light backdrop -->
     <div
-      class="pointer-events-none fixed inset-0 transition-opacity duration-500"
+      class="pointer-events-none fixed inset-0 transition-opacity duration-700"
       :class="primaryScope === 'world' ? 'bg-ambient-glow' : 'bg-ambient-indonesia'"
     />
 
-    <!-- ── Header ──────────────────────────────────────────────── -->
-    <header class="relative z-20 border-b border-white/[0.07] bg-[#070a12]/85 backdrop-blur-md">
-      <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-        <div class="flex items-center gap-2.5">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-slate-900 text-sky-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ── Modern Header ──────────────────────────────────────── -->
+    <header class="sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-[#080b11]/80 backdrop-blur-md">
+      <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-10">
+        <!-- Brand / Logo -->
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 via-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20 ring-1 ring-white/20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10" />
               <line x1="2" y1="12" x2="22" y2="12" />
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
           </div>
-          <span class="text-sm font-bold tracking-tight text-white">GeoGuesser</span>
-          <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-400">Pro</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-display text-base font-black tracking-tight text-slate-900 dark:text-white">GeoGuesser</span>
+              <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                PRO
+              </span>
+            </div>
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400">Geografi Interaktif Dunia & Indonesia</p>
+          </div>
         </div>
 
-        <button
-          type="button"
-          class="focusable flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900/80 px-2.5 text-xs font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-          :aria-pressed="soundEnabled"
-          @click="toggleSound"
-        >
-          <svg v-if="soundEnabled" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-          </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="1" y1="1" x2="23" y2="23" />
-            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
-          </svg>
-          <span class="hidden sm:inline">{{ soundEnabled ? 'Suara' : 'Bisu' }}</span>
-        </button>
+        <!-- Controls: Sound + Dark / Light Mode -->
+        <div class="flex items-center gap-2">
+          <!-- Audio Toggle -->
+          <button
+            type="button"
+            class="focusable flex h-9 items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+            :aria-pressed="soundEnabled"
+            :title="soundEnabled ? 'Matikan suara efek' : 'Aktifkan suara efek'"
+            @click="toggleSound"
+          >
+            <svg v-if="soundEnabled" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23" />
+              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+            </svg>
+            <span class="hidden md:inline">{{ soundEnabled ? 'Suara' : 'Mute' }}</span>
+          </button>
+
+          <!-- Dark / Light Mode Toggle Button -->
+          <button
+            type="button"
+            class="focusable flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+            :title="isDark ? 'Beralih ke Mode Terang (Light Mode)' : 'Beralih ke Mode Gelap (Dark Mode)'"
+            @click="toggleTheme"
+          >
+            <!-- Sun icon when dark -->
+            <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <!-- Moon icon when light -->
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- ── Main ────────────────────────────────────────────────── -->
-    <main class="relative z-10 mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
-      <!-- Hero -->
-      <div class="menu-rise mb-7 grid items-end gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div class="max-w-2xl">
-          <p class="mb-2 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-bold uppercase text-sky-200">
-            <span class="h-1.5 w-1.5 rounded-full bg-sky-300" />
-            Main tebak peta
-          </p>
-          <h1 class="text-[30px] font-black leading-tight text-white sm:text-[42px]">
-            Seberapa hafal kamu sama bentuk wilayah?
+    <!-- ── Main Content Bento Grid ────────────────────────────── -->
+    <main class="relative z-10 mx-auto w-full max-w-[1400px] flex-1 px-4 pb-12 pt-6 sm:px-6 sm:py-8 lg:px-10">
+      <!-- Cool Hero Banner with Live Radar -->
+      <div class="menu-rise relative mb-8 grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div class="max-w-3xl">
+          <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+            <span class="h-1.5 w-1.5 rounded-full bg-sky-500 animate-ping" />
+            Latihan Peta & Batas Wilayah Offline
+          </div>
+
+          <h1 class="font-display text-3xl font-black leading-tight tracking-tight text-slate-900 dark:text-white sm:text-5xl">
+            Tebak bentuk & lokasi <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 via-indigo-500 to-cyan-400">wilayah impianmu</span>
           </h1>
-          <p class="mt-3 max-w-xl text-sm leading-relaxed text-slate-400">
-            Mulai dari kecamatan di Jakarta sampai negara di dunia. Pilih area, pilih gaya main, gas.
+
+          <p class="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            Kuis geografi presisi tinggi. Dari kecamatan di kotamu sampai negara di seberang benua. Siapkan insting spasialmu dan mulai ekspedisi sekarang.
           </p>
+
+          <!-- Quick Scope Summary Counters -->
+          <div class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[11px]">
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">
+              🇮🇩 6.644 Kecamatan
+            </span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">
+              🏙️ 514 Kab / Kota
+            </span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">
+              🏛️ 38 Provinsi
+            </span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">
+              🌍 195 Negara Dunia
+            </span>
+          </div>
         </div>
 
-        <div class="map-radar hidden min-h-44 rounded-2xl p-4 lg:block" aria-hidden="true">
+        <!-- Mini Cockpit Radar -->
+        <div class="map-radar hidden min-h-44 rounded-2xl p-5 lg:block" aria-hidden="true">
           <div class="relative z-10 flex h-full flex-col justify-between">
-            <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300">
-              <span>{{ scopeLabel }}</span>
-              <span class="font-mono text-sky-200">{{ poolSize }} {{ unitLabel }}</span>
+            <div class="flex items-center justify-between font-mono text-xs font-semibold">
+              <span class="truncate text-slate-700 dark:text-slate-200 max-w-[200px]">{{ scopeLabel }}</span>
+              <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-600 dark:text-sky-400">{{ poolSize }} {{ unitLabel }}</span>
             </div>
-            <div class="grid grid-cols-3 gap-2 text-center">
-              <div class="rounded-lg border border-white/10 bg-slate-950/55 px-2 py-2">
-                <p class="text-[10px] text-slate-500">Mode</p>
-                <p class="mt-0.5 truncate text-xs font-bold text-white">{{ selectedMode }}</p>
+
+            <div class="grid grid-cols-3 gap-2 text-center mt-4">
+              <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-950/60 p-2 shadow-sm">
+                <p class="text-[10px] uppercase font-bold text-slate-400">Mode</p>
+                <p class="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">{{ selectedMode === 'A' ? 'Klik Peta' : 'Pilih Nama' }}</p>
               </div>
-              <div class="rounded-lg border border-white/10 bg-slate-950/55 px-2 py-2">
-                <p class="text-[10px] text-slate-500">Ronde</p>
-                <p class="mt-0.5 font-mono text-xs font-bold text-white">{{ Math.min(selectedRounds, poolSize) }}</p>
+              <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-950/60 p-2 shadow-sm">
+                <p class="text-[10px] uppercase font-bold text-slate-400">Ronde</p>
+                <p class="mt-0.5 font-mono text-xs font-bold text-slate-900 dark:text-white">{{ Math.min(selectedRounds, poolSize) }}</p>
               </div>
-              <div class="rounded-lg border border-white/10 bg-slate-950/55 px-2 py-2">
-                <p class="text-[10px] text-slate-500">Waktu</p>
-                <p class="mt-0.5 text-xs font-bold" :class="timerEnabled ? 'text-sky-200' : 'text-slate-300'">
-                  {{ timerEnabled ? '15s' : 'Santai' }}
+              <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-950/60 p-2 shadow-sm">
+                <p class="text-[10px] uppercase font-bold text-slate-400">Waktu</p>
+                <p class="mt-0.5 text-xs font-bold" :class="timerEnabled ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'">
+                  {{ timerEnabled ? '15 dtk' : 'Santai' }}
                 </p>
               </div>
             </div>
           </div>
-          <span class="radar-pin is-hot left-[61%] top-[28%]">ID</span>
-          <span class="radar-pin left-[30%] top-[38%]">A</span>
-          <span class="radar-pin left-[48%] top-[62%]">B</span>
+          <span class="radar-pin is-hot left-[65%] top-[25%]">ID</span>
+          <span class="radar-pin left-[28%] top-[35%]">A</span>
+          <span class="radar-pin left-[52%] top-[65%]">B</span>
         </div>
       </div>
 
-      <!-- Error -->
-      <div v-if="error" class="mb-5 flex items-start gap-2.5 rounded-xl border border-red-500/40 bg-red-950/40 p-3.5 text-xs text-red-200">
-        <svg xmlns="http://www.w3.org/2000/svg" class="mt-px h-4 w-4 shrink-0 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Error notification if dataset fails -->
+      <div v-if="error" class="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-600 dark:text-rose-400">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         <span>{{ error }}</span>
       </div>
 
-      <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <!-- ═══ Kolom kiri: langkah konfigurasi ═══ -->
-        <div class="space-y-4">
-          <!-- ── Langkah 1: Wilayah ── -->
-          <section class="step-card menu-rise p-4 sm:p-5" style="animation-delay: 40ms" aria-labelledby="step-1-title">
-            <div class="mb-4 flex items-center gap-2.5">
-              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800 font-mono text-[11px] font-bold text-slate-300">1</span>
+      <!-- ══ Bento Box Setup Grid ══ -->
+      <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <!-- ── STEP 1: Wilayah Peta (Territory Picker) ── -->
+        <section class="step-card menu-rise p-5 sm:p-6 lg:col-span-7 xl:col-span-8" style="animation-delay: 40ms" aria-labelledby="map-title">
+          <div class="mb-5 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-3.5">
+            <div class="flex items-center gap-3">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">
+                1
+              </span>
               <div>
-                <h2 id="step-1-title" class="text-sm font-bold text-white">Wilayah</h2>
-                <p class="text-xs text-slate-400">Mau main di peta mana?</p>
+                <h2 id="map-title" class="text-sm font-bold text-slate-900 dark:text-white">Pilih Wilayah</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Tentukan peta dan tingkat cakupan yang mau kamu uji.</p>
               </div>
             </div>
 
-            <div class="seg-track" role="radiogroup" aria-label="Cakupan wilayah">
-              <button
-                type="button"
-                role="radio"
-                class="seg-item focusable"
-                :aria-checked="primaryScope === 'world'"
-                :class="primaryScope === 'world' ? 'bg-sky-500 text-slate-950 shadow-sm' : ''"
-                @click="selectPrimaryScope('world')"
+            <span class="hidden sm:inline-flex rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+              {{ poolSize }} wilayah siap
+            </span>
+          </div>
+
+          <!-- Two Main Scope Cards: Dunia vs Indonesia -->
+          <div class="grid gap-3.5 sm:grid-cols-2" role="radiogroup" aria-label="Cakupan Utama">
+            <!-- Dunia Option -->
+            <button
+              type="button"
+              role="radio"
+              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
+              :aria-checked="primaryScope === 'world'"
+              :class="primaryScope === 'world' ? '!border-sky-500/60 !bg-sky-500/10 ring-2 ring-sky-500/20' : ''"
+              @click="selectPrimaryScope('world')"
+            >
+              <span
+                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition"
+                :class="primaryScope === 'world' ? 'border-sky-500/50 bg-sky-500/20 text-sky-600 dark:text-sky-400' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80 text-slate-500'"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                 </svg>
-                Dunia
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="font-display text-sm font-bold text-slate-900 dark:text-white">Seluruh Dunia</span>
+                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">195 negara lintas benua.</span>
+                <span
+                  v-if="primaryScope === 'world'"
+                  class="mt-2 inline-flex items-center gap-1 rounded-md border border-sky-500/40 bg-sky-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400"
+                >✓ Aktif</span>
+              </span>
+            </button>
+
+            <!-- Indonesia Option -->
+            <button
+              type="button"
+              role="radio"
+              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
+              :aria-checked="primaryScope === 'indonesia'"
+              :class="primaryScope === 'indonesia' ? '!border-rose-500/60 !bg-rose-500/10 ring-2 ring-rose-500/20' : ''"
+              @click="selectPrimaryScope('indonesia')"
+            >
+              <span
+                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
+                :class="primaryScope === 'indonesia' ? 'border-rose-500/50 bg-rose-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
+              >🇮🇩</span>
+              <span class="min-w-0 flex-1">
+                <span class="font-display text-sm font-bold text-slate-900 dark:text-white">Indonesia</span>
+                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">Provinsi, kab/kota, sampai kecamatan.</span>
+                <span
+                  v-if="primaryScope === 'indonesia'"
+                  class="mt-2 inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-rose-600 dark:text-rose-400"
+                >✓ Aktif</span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Filter Benua / Pulau (Dunia & 38 Provinsi) -->
+          <div
+            v-if="activeScope !== 'id-kabupaten' && activeScope !== 'id-kecamatan' && activeScope !== 'id-mixed'"
+            class="mt-5"
+          >
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              {{ activeScope === 'id-provinces' ? 'Saring Kepulauan' : 'Saring Benua' }}
+            </label>
+            <div class="mt-2 max-w-sm">
+              <SearchSelect
+                v-model="regionFilter"
+                :options="regionFilterOptions"
+                :label="activeScope === 'id-provinces' ? 'Saring Kepulauan' : 'Saring Benua'"
+                accent="sky"
+                :search-placeholder="activeScope === 'id-provinces' ? 'Cari kepulauan…' : 'Cari benua…'"
+              />
+            </div>
+          </div>
+
+          <!-- ── Sub-opsi Indonesia: Segmented Level Picker ── -->
+          <div v-if="primaryScope === 'indonesia'" class="mt-5 space-y-4">
+            <div class="seg-track grid grid-cols-2 sm:grid-cols-4" role="radiogroup" aria-label="Tingkat wilayah Indonesia">
+              <button
+                type="button"
+                role="radio"
+                class="seg-item focusable text-center justify-center"
+                :aria-checked="indonesiaLevel === 'provinces'"
+                :class="indonesiaLevel === 'provinces' ? '!bg-white dark:!bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm' : ''"
+                @click="selectIndonesiaLevel('provinces')"
+              >
+                <span>🏛️</span> 38 Provinsi
               </button>
               <button
                 type="button"
                 role="radio"
-                class="seg-item focusable"
-                :aria-checked="primaryScope === 'indonesia'"
-                :class="primaryScope === 'indonesia' ? 'bg-rose-500 text-white shadow-sm' : ''"
-                @click="selectPrimaryScope('indonesia')"
+                class="seg-item focusable text-center justify-center"
+                :aria-checked="indonesiaLevel === 'kabupaten'"
+                :class="indonesiaLevel === 'kabupaten' ? '!bg-white dark:!bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm' : ''"
+                @click="selectIndonesiaLevel('kabupaten')"
               >
-                <span aria-hidden="true">🇮🇩</span>
-                Indonesia
+                <span>🏙️</span> Kab / Kota
+              </button>
+              <button
+                type="button"
+                role="radio"
+                class="seg-item focusable text-center justify-center"
+                :aria-checked="indonesiaLevel === 'kecamatan'"
+                :class="indonesiaLevel === 'kecamatan' ? '!bg-white dark:!bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm' : ''"
+                @click="selectIndonesiaLevel('kecamatan')"
+              >
+                <span>🏘️</span> Kecamatan
+              </button>
+              <button
+                type="button"
+                role="radio"
+                class="seg-item focusable text-center justify-center"
+                :aria-checked="indonesiaLevel === 'mixed'"
+                :class="indonesiaLevel === 'mixed' ? '!bg-white dark:!bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm' : ''"
+                @click="selectIndonesiaLevel('mixed')"
+              >
+                <span>🎲</span> Campuran
               </button>
             </div>
 
-            <!-- Sub-opsi Indonesia -->
-            <div v-if="primaryScope === 'indonesia'" class="mt-3.5 space-y-3.5">
-              <div class="seg-track grid grid-cols-2 sm:grid-cols-4" role="radiogroup" aria-label="Tingkat wilayah Indonesia">
-                <button
-                  type="button"
-                  role="radio"
-                  class="seg-item focusable text-center justify-center"
-                  :aria-checked="indonesiaLevel === 'provinces'"
-                  :class="indonesiaLevel === 'provinces' ? 'bg-rose-500/90 text-white shadow-sm' : ''"
-                  @click="selectIndonesiaLevel('provinces')"
-                >
-                  <span aria-hidden="true">🏛️</span> 38 Provinsi
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  class="seg-item focusable text-center justify-center"
-                  :aria-checked="indonesiaLevel === 'kabupaten'"
-                  :class="indonesiaLevel === 'kabupaten' ? 'bg-amber-400 text-slate-950 shadow-sm' : ''"
-                  @click="selectIndonesiaLevel('kabupaten')"
-                >
-                  <span aria-hidden="true">🏙️</span> Kab / Kota
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  class="seg-item focusable text-center justify-center"
-                  :aria-checked="indonesiaLevel === 'kecamatan'"
-                  :class="indonesiaLevel === 'kecamatan' ? 'bg-sky-400 text-slate-950 shadow-sm' : ''"
-                  @click="selectIndonesiaLevel('kecamatan')"
-                >
-                  <span aria-hidden="true">🏘️</span> Kecamatan
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  class="seg-item focusable text-center justify-center"
-                  :aria-checked="indonesiaLevel === 'mixed'"
-                  :class="indonesiaLevel === 'mixed' ? 'bg-violet-500 text-white shadow-sm' : ''"
-                  @click="selectIndonesiaLevel('mixed')"
-                >
-                  <span aria-hidden="true">🎲</span> Campuran
-                </button>
-              </div>
-
-              <!-- Panel mode campuran -->
-              <div v-if="indonesiaLevel === 'mixed'" class="space-y-3 rounded-xl border border-violet-500/30 bg-slate-950/50 p-3.5 shadow-sm">
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="text-xs font-semibold text-violet-200">Acak lintas tingkat</span>
-                    <span class="rounded bg-violet-500/15 px-1.5 py-0.2 text-[10px] font-bold text-violet-300">Baru</span>
+            <!-- LEVEL: KECAMATAN (Fitur Unggulan) -->
+            <div v-if="indonesiaLevel === 'kecamatan'" class="space-y-4 rounded-2xl border border-sky-500/20 bg-sky-500/[0.03] dark:bg-sky-950/20 p-4 sm:p-5 shadow-sm">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">Pilih Kabupaten / Kota</span>
+                    <span class="rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400">Level Mikro</span>
                   </div>
-                  <p class="mt-0.5 text-[11px] text-slate-400">
-                    Tiap ronde bisa loncat antara provinsi, kab/kota, atau kecamatan.
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Cari kota apa saja di Indonesia untuk menebak batas-batas kecamatannya.
                   </p>
                 </div>
 
-                <div class="space-y-1.5">
-                  <p class="text-[11px] font-medium text-slate-400">Tingkat yang diikutkan</p>
-                  <div class="grid grid-cols-3 gap-1.5">
-                    <button
-                      v-for="lvl in [
-                        { key: 'province' as const, label: 'Provinsi', icon: '🏛️', n: 38 },
-                        { key: 'kabupaten' as const, label: 'Kab/Kota', icon: '🏙️', n: 514 },
-                        { key: 'kecamatan' as const, label: 'Kecamatan', icon: '🏘️', n: mixedCityCount * 13 },
-                      ]"
-                      :key="lvl.key"
-                      type="button"
-                      class="focusable rounded-lg border px-2 py-1.5 text-center transition"
-                      :aria-pressed="mixedLevels[lvl.key]"
-                      :class="mixedLevels[lvl.key]
-                        ? 'border-violet-400 bg-violet-500/15 text-violet-100'
-                        : 'border-white/[0.08] bg-slate-900/70 text-slate-500 hover:bg-slate-800'"
-                      @click="toggleMixedLevel(lvl.key)"
-                    >
-                      <span class="block text-xs" aria-hidden="true">{{ lvl.icon }}</span>
-                      <span class="mt-0.5 block text-[10px] font-semibold">{{ lvl.label }}</span>
-                      <span class="block text-[9px] tabular-nums opacity-70">±{{ lvl.n }}</span>
-                    </button>
-                  </div>
-                </div>
+                <div class="w-full space-y-2 sm:w-80">
+                  <!-- Provinsi filter dropdown -->
+                  <SearchSelect
+                    v-model="kecamatanProvince"
+                    :options="provinceOptions"
+                    label="Pilih Provinsi"
+                    accent="sky"
+                    search-placeholder="Cari provinsi…"
+                  />
 
-                <div v-if="mixedLevels.kecamatan" class="space-y-1.5">
-                  <div class="flex items-baseline justify-between">
-                    <p class="text-[11px] font-medium text-slate-400">Ambil kecamatan dari</p>
-                    <span class="text-[10px] tabular-nums text-slate-500">{{ mixedCityCount }} kota</span>
-                  </div>
-                  <!-- Tiap kota adalah satu file terpisah, jadi ini langsung
-                       menentukan berapa banyak yang diunduh. -->
-                  <input
-                    v-model.number="mixedCityCount"
-                    type="range"
-                    min="2"
-                    max="12"
-                    step="1"
-                    aria-label="Jumlah kota sumber kecamatan"
-                    class="focusable w-full accent-violet-400"
-                  >
-                  <p class="text-[10px] text-slate-500">
-                    Makin banyak kota, soalnya makin rame. Loading juga bisa sedikit lebih lama.
-                  </p>
+                  <!-- CityPicker Combobox (Search across 514 cities) -->
+                  <CityPicker
+                    :cities="availableCities"
+                    :provinces="kecamatanProvinces"
+                    :selected-id="activeKecamatanCity?.id ?? null"
+                    :province="kecamatanProvince"
+                    :disabled="pending"
+                    @select="selectCity"
+                  />
                 </div>
-
-                <p class="rounded-lg border border-violet-500/15 bg-violet-950/20 px-2.5 py-2 text-[11px] text-violet-200">
-                  Sekitar <span class="font-bold tabular-nums">±{{ mixedEstimate }}</span> wilayah bakal masuk pool.
-                </p>
               </div>
 
-              <!-- Pemilih Kota/Kecamatan (level kecamatan) -->
-              <div v-if="indonesiaLevel === 'kecamatan'" class="space-y-3 rounded-xl border border-sky-500/30 bg-slate-950/50 p-3.5 shadow-sm">
-                <div class="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <label for="city-select" class="text-xs font-semibold text-sky-200">Pilih kota</label>
-                      <span class="rounded bg-sky-500/15 px-1.5 py-0.2 text-[10px] font-bold text-sky-400">Mikro</span>
-                    </div>
-                    <p class="mt-0.5 text-[11px] text-slate-400">Nanti yang ditebak batas kecamatan di kota ini.</p>
-                  </div>
-
-                  <div class="w-full sm:w-72 space-y-2">
-                    <!-- Provinsi menyaring daftar; pencarian di dalam picker
-                         menembus semua provinsi. -->
-                    <SearchSelect
-                      v-model="kecamatanProvince"
-                      :options="provinceOptions"
-                      label="Provinsi"
-                      accent="slate"
-                      search-placeholder="Cari provinsi…"
-                    />
-
-                    <CityPicker
-                      :cities="availableCities"
-                      :provinces="kecamatanProvinces"
-                      :selected-id="activeKecamatanCity?.id ?? null"
-                      :province="kecamatanProvince"
-                      :disabled="pending"
-                      @select="selectCity"
-                    />
-                  </div>
-                </div>
-
-                <!-- Quick pick for Jakarta Cities -->
+              <!-- Quick chips for popular cities -->
+              <div class="space-y-2 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="text-[11px] font-medium text-slate-500">DKI Jakarta</span>
+                  <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">DKI Jakarta:</span>
                   <button
                     v-for="c in quickCities"
                     :key="c.id"
@@ -666,163 +698,221 @@ onBeforeUnmount(() => {
                     class="focusable rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition"
                     :aria-pressed="activeKecamatanCity?.id === c.id"
                     :class="activeKecamatanCity?.id === c.id
-                      ? 'border-sky-400 bg-sky-400 text-slate-950'
-                      : 'border-white/[0.08] bg-slate-800/70 text-slate-300 hover:bg-slate-700 hover:text-white'"
+                      ? 'border-sky-500 bg-sky-600 text-white shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40'"
                     @click="selectCity(c.id)"
                   >
                     {{ c.city.replace(/^(Kota|Kabupaten)( Administrasi)? /, '') }}
                   </button>
                 </div>
 
-                <!-- Live badges preview of all kecamatan in selectedCity -->
-                <div class="rounded-lg border border-sky-500/15 bg-slate-900/70 p-2.5">
-                  <div class="mb-2 flex items-center justify-between text-[11px]">
-                    <span class="font-semibold text-sky-300 flex items-center gap-1.5">
-                      <span class="inline-block h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
-                      {{ activeCityDistricts.length }} Kecamatan di {{ selectedCity }}
-                    </span>
-                    <span class="text-[10px] text-slate-500 font-mono">Data offline</span>
-                  </div>
-                  <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-                    <span
-                      v-for="d in activeCityDistricts"
-                      :key="d.id"
-                      class="rounded-md border border-sky-500/20 bg-sky-950/40 px-2 py-0.5 text-[11px] font-medium text-sky-200"
-                    >
-                      {{ d.name }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Pemilih provinsi (hanya di level kab/kota) -->
-              <div v-if="indonesiaLevel === 'kabupaten'" class="space-y-3 rounded-xl border border-amber-500/20 bg-slate-950/50 p-3.5">
-                <div class="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
-                  <div class="min-w-0">
-                    <label for="province-select" class="text-xs font-semibold text-amber-200">Pilih provinsi</label>
-                    <p class="mt-0.5 text-[11px] text-slate-400">Soalnya dari kabupaten & kota di provinsi ini.</p>
-                  </div>
-
-                  <div class="w-full sm:w-56">
-                    <SearchSelect
-                      v-model="selectedProvince"
-                      :options="kabupatenProvinceOptions"
-                      label="Pilih provinsi"
-                      accent="amber"
-                      search-placeholder="Cari provinsi…"
-                    />
-                  </div>
-                </div>
-
-                <!-- Quick pick -->
+                <!-- Major regional cities chips -->
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="text-[11px] font-medium text-slate-500">Populer</span>
+                  <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">Kota Lain:</span>
                   <button
-                    v-for="prov in quickProvinces"
-                    :key="prov"
+                    v-for="c in popularMajorCities"
+                    :key="c.id"
                     type="button"
                     class="focusable rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition"
-                    :aria-pressed="selectedProvince === prov"
-                    :class="selectedProvince === prov
-                      ? 'border-amber-400 bg-amber-400 text-slate-950'
-                      : 'border-white/[0.08] bg-slate-800/70 text-slate-300 hover:bg-slate-700 hover:text-white'"
-                    @click="selectProvince(prov)"
+                    :aria-pressed="activeKecamatanCity?.id === c.id"
+                    :class="activeKecamatanCity?.id === c.id
+                      ? 'border-sky-500 bg-sky-600 text-white shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-sky-500/40'"
+                    @click="selectCity(c.id)"
                   >
-                    {{ prov }}
+                    {{ c.city.replace(/^(Kota|Kabupaten)( Administrasi)? /, '') }}
                   </button>
                 </div>
+              </div>
 
-                <!-- Preview daftar wilayah -->
-                <details class="group">
-                  <summary class="focusable flex cursor-pointer list-none items-center justify-between rounded-lg py-1 text-[11px] font-semibold text-slate-400 transition hover:text-slate-200 [&::-webkit-details-marker]:hidden">
-                    <span>Lihat {{ activeProvinceCities.length }} wilayah di {{ selectedProvince }}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </summary>
-                  <div class="mt-2 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
-                    <span
-                      v-for="city in activeProvinceCities"
-                      :key="city.id"
-                      class="rounded-md border border-white/[0.08] bg-slate-900/80 px-2 py-0.5 text-[11px] text-slate-300"
-                    >
-                      {{ city.name }}
+              <!-- Live Kecamatan Preview Badges Strip (e.g. Jakarta Barat's 8 subdistricts) -->
+              <div class="rounded-xl border border-sky-500/30 bg-white/80 dark:bg-slate-900/80 p-3.5 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">
+                      {{ activeCityDistricts.length }} Kecamatan di {{ selectedCity }}
                     </span>
                   </div>
-                </details>
+                  <span class="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                    Offline GeoJSON Siap
+                  </span>
+                </div>
+
+                <div class="mt-2.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                  <span
+                    v-for="d in activeCityDistricts"
+                    :key="d.id"
+                    class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono text-[11px] font-medium text-sky-700 dark:text-sky-300"
+                  >
+                    {{ d.name }}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <!-- Filter benua / kepulauan -->
-            <div
-              v-if="activeScope !== 'id-kabupaten' && activeScope !== 'id-kecamatan' && activeScope !== 'id-mixed'"
-              class="mt-3.5"
-            >
-              <label for="region-select" class="text-xs font-semibold text-slate-300">
-                {{ activeScope === 'id-provinces' ? 'Filter pulau' : 'Filter benua' }}
-              </label>
-              <div class="mt-1.5">
-                <SearchSelect
-                  v-model="regionFilter"
-                  :options="regionFilterOptions"
-                  :label="activeScope === 'id-provinces' ? 'Filter pulau' : 'Filter benua'"
-                  accent="slate"
-                  :search-placeholder="activeScope === 'id-provinces' ? 'Cari pulau…' : 'Cari benua…'"
-                />
+            <!-- LEVEL: KABUPATEN / KOTA -->
+            <div v-if="indonesiaLevel === 'kabupaten'" class="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 p-4 sm:p-5 shadow-sm">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                  <label class="text-xs font-bold text-slate-900 dark:text-white">Pilih Provinsi Induk</label>
+                  <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Soal akan mengambil seluruh kab/kota di provinsi ini.</p>
+                </div>
+
+                <div class="w-full sm:w-64">
+                  <SearchSelect
+                    v-model="selectedProvince"
+                    :options="kabupatenProvinceOptions"
+                    label="Pilih provinsi"
+                    accent="sky"
+                    search-placeholder="Cari provinsi…"
+                  />
+                </div>
+              </div>
+
+              <!-- Quick pick popular provinces -->
+              <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
+                <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">Populer:</span>
+                <button
+                  v-for="prov in quickProvinces"
+                  :key="prov"
+                  type="button"
+                  class="focusable rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition"
+                  :aria-pressed="selectedProvince === prov"
+                  :class="selectedProvince === prov
+                    ? 'border-sky-500 bg-sky-600 text-white shadow-sm'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-sky-500/40'"
+                  @click="selectProvince(prov)"
+                >
+                  {{ prov }}
+                </button>
+              </div>
+
+              <!-- Preview kab/kota -->
+              <details class="group rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+                <summary class="focusable flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+                  <span>Lihat {{ activeProvinceCities.length }} wilayah di {{ selectedProvince }}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-open:rotate-180 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                  </svg>
+                </summary>
+                <div class="mt-2.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pr-1 pt-1">
+                  <span
+                    v-for="city in activeProvinceCities"
+                    :key="city.id"
+                    class="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 font-mono text-[11px] text-slate-700 dark:text-slate-300"
+                  >
+                    {{ city.name }}
+                  </span>
+                </div>
+              </details>
+            </div>
+
+            <!-- LEVEL: CAMPURAN (Multi-tier) -->
+            <div v-if="indonesiaLevel === 'mixed'" class="space-y-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 sm:p-5 shadow-sm">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">Mode Campuran Acak</span>
+                    <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Multi-Tingkat</span>
+                  </div>
+                  <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    Setiap ronde akan berganti secara dinamis antara provinsi, kab/kota, dan kecamatan.
+                  </p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="lvl in [
+                    { key: 'province' as const, label: 'Provinsi', icon: '🏛️', n: 38 },
+                    { key: 'kabupaten' as const, label: 'Kab/Kota', icon: '🏙️', n: 514 },
+                    { key: 'kecamatan' as const, label: 'Kecamatan', icon: '🏘️', n: mixedCityCount * 13 },
+                  ]"
+                  :key="lvl.key"
+                  type="button"
+                  class="focusable rounded-xl border p-3 text-center transition"
+                  :aria-pressed="mixedLevels[lvl.key]"
+                  :class="mixedLevels[lvl.key]
+                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'"
+                  @click="toggleMixedLevel(lvl.key)"
+                >
+                  <span class="block text-base" aria-hidden="true">{{ lvl.icon }}</span>
+                  <span class="mt-1 block text-xs font-bold">{{ lvl.label }}</span>
+                  <span class="mt-0.5 block font-mono text-[10px] opacity-80">±{{ lvl.n }} soal</span>
+                </button>
+              </div>
+
+              <div v-if="mixedLevels.kecamatan" class="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
+                <div class="flex items-baseline justify-between text-xs">
+                  <span class="font-medium text-slate-700 dark:text-slate-300">Sumber Kecamatan</span>
+                  <span class="font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ mixedCityCount }} Kota Terpilih</span>
+                </div>
+                <input
+                  v-model.number="mixedCityCount"
+                  type="range"
+                  min="2"
+                  max="12"
+                  step="1"
+                  aria-label="Jumlah kota sumber kecamatan"
+                  class="w-full accent-indigo-600 cursor-pointer"
+                >
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <!-- ── Langkah 2: Mode ── -->
-          <section class="step-card menu-rise p-4 sm:p-5" style="animation-delay: 90ms" aria-labelledby="step-2-title">
-            <div class="mb-4 flex items-center gap-2.5">
-              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800 font-mono text-[11px] font-bold text-slate-300">2</span>
+        <!-- ── STEP 2 & 3: Mode & Sesi ── -->
+        <div class="space-y-6 lg:col-span-5 xl:col-span-4">
+          <!-- STEP 2: Mode Permainan -->
+          <section class="step-card menu-rise p-5 sm:p-6" style="animation-delay: 80ms" aria-labelledby="mode-title">
+            <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">
+                2
+              </span>
               <div>
-                <h2 id="step-2-title" class="text-sm font-bold text-white">Cara main</h2>
-                <p class="text-xs text-slate-400">Mau klik peta atau pilih jawaban?</p>
+                <h2 id="mode-title" class="text-sm font-bold text-slate-900 dark:text-white">Mode Tantangan</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Pilih gaya interaksi permainan.</p>
               </div>
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Mode permainan">
+            <div class="grid gap-3" role="radiogroup" aria-label="Mode permainan">
               <!-- Mode A -->
               <button
                 type="button"
                 role="radio"
                 class="pick-card focusable p-4"
                 :aria-checked="selectedMode === 'A'"
-                :class="selectedMode === 'A' ? '!border-sky-500/70 !bg-sky-500/10 ring-1 ring-sky-500/40' : ''"
+                :class="selectedMode === 'A' ? '!border-sky-500 !bg-sky-500/10 ring-2 ring-sky-500/20' : ''"
                 @click="selectMode('A')"
               >
-                <div class="mb-2.5 flex items-center justify-between">
-                  <div
-                    class="flex h-9 w-9 items-center justify-center rounded-lg border transition"
-                    :class="selectedMode === 'A' ? 'border-sky-400/40 bg-sky-500/20 text-sky-300' : 'border-white/10 bg-slate-800/80 text-slate-400'"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" />
-                      <line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" />
-                    </svg>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                      :class="selectedMode === 'A' ? 'border-sky-500/50 bg-sky-500/20 text-sky-600 dark:text-sky-400' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" />
+                        <line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="font-display text-sm font-bold text-slate-900 dark:text-white">Klik Petanya (Pinpoint)</h3>
+                      <p class="text-[11px] text-slate-500 dark:text-slate-400">Cari & klik langsung lokasi di peta.</p>
+                    </div>
                   </div>
+
                   <span
-                    class="flex h-4.5 w-4.5 items-center justify-center rounded-full border transition"
-                    :class="selectedMode === 'A' ? 'border-sky-400 bg-sky-400' : 'border-white/20'"
-                    aria-hidden="true"
+                    class="flex h-5 w-5 items-center justify-center rounded-full border transition"
+                    :class="selectedMode === 'A' ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 dark:border-slate-700'"
                   >
-                    <svg v-if="selectedMode === 'A'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg v-if="selectedMode === 'A'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </span>
                 </div>
-                <h3 class="text-sm font-bold text-white">Klik Petanya</h3>
-                <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
-                  {{ activeScope === 'id-kecamatan'
-                    ? `Muncul nama seperti ${activeProvinceExampleCity}. Tugasmu klik kecamatannya.`
-                    : activeScope === 'id-kabupaten'
-                      ? `Muncul nama seperti ${activeProvinceExampleCity}. Tugasmu klik wilayahnya.`
-                      : activeScope === 'id-provinces'
-                        ? 'Muncul nama provinsi. Klik wilayahnya di peta.'
-                        : 'Muncul nama negara. Klik wilayahnya di peta dunia.' }}
-                </p>
               </button>
 
               <!-- Mode B -->
@@ -831,60 +921,65 @@ onBeforeUnmount(() => {
                 role="radio"
                 class="pick-card focusable p-4"
                 :aria-checked="selectedMode === 'B'"
-                :class="selectedMode === 'B' ? '!border-amber-500/70 !bg-amber-500/10 ring-1 ring-amber-500/40' : ''"
+                :class="selectedMode === 'B' ? '!border-sky-500 !bg-sky-500/10 ring-2 ring-sky-500/20' : ''"
                 @click="selectMode('B')"
               >
-                <div class="mb-2.5 flex items-center justify-between">
-                  <div
-                    class="flex h-9 w-9 items-center justify-center rounded-lg border transition"
-                    :class="selectedMode === 'B' ? 'border-amber-400/40 bg-amber-500/20 text-amber-300' : 'border-white/10 bg-slate-800/80 text-slate-400'"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
-                    </svg>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
+                      :class="selectedMode === 'B' ? 'border-sky-500/50 bg-sky-500/20 text-sky-600 dark:text-sky-400' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="font-display text-sm font-bold text-slate-900 dark:text-white">Tebak Nama (Identify)</h3>
+                      <p class="text-[11px] text-slate-500 dark:text-slate-400">Wilayah disorot, pilih nama dari opsi.</p>
+                    </div>
                   </div>
+
                   <span
-                    class="flex h-4.5 w-4.5 items-center justify-center rounded-full border transition"
-                    :class="selectedMode === 'B' ? 'border-amber-400 bg-amber-400' : 'border-white/20'"
-                    aria-hidden="true"
+                    class="flex h-5 w-5 items-center justify-center rounded-full border transition"
+                    :class="selectedMode === 'B' ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 dark:border-slate-700'"
                   >
-                    <svg v-if="selectedMode === 'B'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg v-if="selectedMode === 'B'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </span>
                 </div>
-                <h3 class="text-sm font-bold text-white">Pilih Nama</h3>
-                <p class="mt-1 text-[11px] leading-relaxed text-slate-400">
-                  Satu wilayah disorot. Kamu tinggal pilih nama yang bener.
-                </p>
               </button>
             </div>
           </section>
 
-          <!-- ── Langkah 3: Sesi ── -->
-          <section class="step-card menu-rise p-4 sm:p-5" style="animation-delay: 140ms" aria-labelledby="step-3-title">
-            <div class="mb-4 flex items-center gap-2.5">
-              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-800 font-mono text-[11px] font-bold text-slate-300">3</span>
+          <!-- STEP 3: Konfigurasi Sesi & Timer -->
+          <section class="step-card menu-rise p-5 sm:p-6" style="animation-delay: 120ms" aria-labelledby="session-title">
+            <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">
+                3
+              </span>
               <div>
-                <h2 id="step-3-title" class="text-sm font-bold text-white">Set sesi</h2>
-                <p class="text-xs text-slate-400">Berapa ronde, pakai timer atau santai.</p>
+                <h2 id="session-title" class="text-sm font-bold text-slate-900 dark:text-white">Pengaturan Sesi</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Jumlah soal dan batas waktu tebakan.</p>
               </div>
             </div>
 
             <div class="space-y-4">
+              <!-- Rounds Selector -->
               <div>
-                <span id="rounds-label" class="text-xs font-semibold text-slate-300">Jumlah ronde</span>
-                <div class="mt-1.5 flex flex-wrap gap-2" role="radiogroup" aria-labelledby="rounds-label">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Jumlah Ronde</span>
+                <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Jumlah Ronde">
                   <button
                     v-for="count in availableRoundOptions"
                     :key="count.value"
                     type="button"
                     role="radio"
-                    class="focusable min-w-16 flex-1 rounded-lg border py-2 text-xs font-bold transition"
+                    class="focusable flex-1 rounded-xl border py-2 text-center text-xs font-bold transition"
                     :aria-checked="selectedRounds === count.value"
                     :class="selectedRounds === count.value
-                      ? 'border-sky-500 bg-sky-500/15 text-sky-300'
-                      : 'border-white/10 bg-slate-900/60 text-slate-400 hover:border-white/20 hover:text-white'"
+                      ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'"
                     @click="selectedRounds = count.value; playClick()"
                   >
                     {{ count.label }}
@@ -892,153 +987,154 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <!-- Timer switch -->
+              <!-- 15s Timer Toggle -->
               <button
                 type="button"
                 role="switch"
-                class="focusable flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-slate-900/50 p-3 text-left transition hover:border-white/[0.14]"
+                class="focusable flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3.5 text-left transition hover:border-sky-500/40"
                 :aria-checked="timerEnabled"
                 @click="toggleTimer"
               >
-                <span class="min-w-0">
-                  <span class="block text-xs font-semibold text-slate-100">Timer 15 detik</span>
-                  <span class="mt-0.5 block text-[11px] text-slate-400">Biar agak deg-degan.</span>
-                </span>
-                <span
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">Timer 15 Detik</span>
+                    <span v-if="timerEnabled" class="rounded-full bg-amber-500/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-amber-600 dark:text-amber-400">Aktif</span>
+                  </div>
+                  <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Uji ketangkasan berpikir cepat dalam 15s.</p>
+                </div>
+
+                <div
                   class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
-                  :class="timerEnabled ? 'bg-sky-500' : 'bg-slate-700'"
+                  :class="timerEnabled ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'"
                   aria-hidden="true"
                 >
                   <span
                     class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
                     :class="timerEnabled ? 'translate-x-[1.125rem]' : 'translate-x-[0.1875rem]'"
                   />
-                </span>
+                </div>
               </button>
+
+              <!-- Collapsible Scoring Rules -->
+              <div>
+                <button
+                  type="button"
+                  class="focusable flex w-full items-center justify-between rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-slate-100/60 dark:bg-slate-900/40 px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800/70"
+                  :aria-expanded="showRules"
+                  @click="showRules = !showRules"
+                >
+                  <span>Sistem Penilaian Skor</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" :class="showRules ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                <div v-if="showRules" class="mt-2 space-y-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                  <p><strong class="text-slate-900 dark:text-white">+10 poin</strong> untuk setiap tebakan yang tepat.</p>
+                  <p><strong class="text-slate-900 dark:text-white">+2 poin bonus</strong> untuk setiap kenaikan streak beruntun.</p>
+                  <p><strong class="text-slate-900 dark:text-white">Salah tebak</strong> tidak mengurangi poin (hanya mereset streak).</p>
+                </div>
+              </div>
             </div>
           </section>
         </div>
+      </div>
 
-        <!-- ═══ Kolom kanan: ringkasan + CTA ═══ -->
-        <aside class="menu-rise lg:sticky lg:top-6" style="animation-delay: 190ms">
-          <div class="step-card overflow-hidden">
-            <div class="border-b border-white/[0.07] px-4 py-3">
-              <div class="flex items-center justify-between gap-3">
-                <h2 class="text-xs font-bold uppercase text-slate-400">Setup kamu</h2>
-                <span class="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                  {{ canStart ? 'Ready' : 'Loading' }}
-                </span>
-              </div>
-            </div>
-
-            <dl class="divide-y divide-white/[0.05] px-4 text-xs">
-              <div class="flex items-center justify-between gap-3 py-2.5">
-                <dt class="text-slate-400">Wilayah</dt>
-                <dd class="truncate font-semibold text-white">{{ scopeLabel }}</dd>
-              </div>
-              <div class="flex items-center justify-between gap-3 py-2.5">
-                <dt class="text-slate-400">Mode</dt>
-                <dd class="font-semibold" :class="selectedMode === 'A' ? 'text-sky-300' : 'text-amber-300'">
-                  {{ modeLabel }}
-                </dd>
-              </div>
-              <div class="flex items-center justify-between gap-3 py-2.5">
-                <dt class="text-slate-400">Ronde</dt>
-                <dd class="font-mono font-semibold text-white">
-                  {{ Math.min(selectedRounds, poolSize) }}
-                  <span class="text-slate-500">/ {{ poolSize }} {{ unitLabel }}</span>
-                </dd>
-              </div>
-              <div class="flex items-center justify-between gap-3 py-2.5">
-                <dt class="text-slate-400">Timer</dt>
-                <dd class="font-semibold" :class="timerEnabled ? 'text-sky-300' : 'text-slate-500'">
-                  {{ timerEnabled ? '15 detik' : 'Nonaktif' }}
-                </dd>
-              </div>
-            </dl>
-
-            <div class="px-4 pt-4">
-              <div class="overflow-hidden rounded-xl border border-white/[0.08] bg-slate-950/60">
-                <div class="h-1.5 bg-slate-800">
-                  <div
-                    class="h-full rounded-r-full bg-sky-400 transition-all"
-                    :style="{ width: `${Math.max(8, Math.min(100, (Math.min(selectedRounds, poolSize) / Math.max(poolSize, 1)) * 100))}%` }"
-                  />
-                </div>
-                <div class="flex items-center justify-between px-3 py-2 text-[11px]">
-                  <span class="text-slate-400">Dipakai</span>
-                  <span class="font-mono font-semibold text-slate-200">
-                    {{ Math.min(selectedRounds, poolSize) }} dari {{ poolSize }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="p-4 pt-3">
-              <button
-                type="button"
-                :disabled="!canStart"
-                class="focusable group inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-bold text-slate-950 shadow-lg transition hover:bg-slate-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
-                @click="start"
-              >
-                <span
-                  v-if="pending"
-                  class="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-slate-900"
-                  aria-hidden="true"
-                />
-                <span>{{ pending || mixedPending ? 'Lagi siapin peta…' : `Gas ${Math.min(selectedRounds, poolSize)} Ronde` }}</span>
-                <svg v-if="!pending" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
-              </button>
-              <p class="mt-2 hidden items-center justify-center gap-1.5 text-[11px] text-slate-500 lg:flex">
-                Enter juga bisa
-              </p>
-            </div>
-          </div>
-
-          <!-- Rekor -->
-          <div v-if="stats.gamesPlayed > 0" class="mt-4 grid grid-cols-3 gap-2">
-            <div class="step-card p-3 text-center">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Skor</p>
-              <p class="mt-0.5 font-mono text-lg font-black text-white">{{ stats.bestScore }}</p>
-            </div>
-            <div class="step-card p-3 text-center">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Streak</p>
-              <p class="mt-0.5 font-mono text-lg font-black text-amber-400">{{ stats.bestStreak }}</p>
-            </div>
-            <div class="step-card p-3 text-center">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sesi</p>
-              <p class="mt-0.5 font-mono text-lg font-black text-sky-400">{{ stats.gamesPlayed }}</p>
-            </div>
-          </div>
-
-          <!-- Aturan skor -->
-          <div class="mt-4">
-            <button
-              type="button"
-              class="focusable flex w-full items-center justify-between rounded-xl border border-white/[0.07] bg-slate-900/40 px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-white/[0.14] hover:text-white"
-              :aria-expanded="showRules"
-              @click="showRules = !showRules"
-            >
-              <span>Skornya gimana?</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" :class="showRules ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-              </svg>
-            </button>
-            <div v-if="showRules" class="mt-2 space-y-1.5 rounded-xl border border-white/[0.07] bg-slate-900/60 p-3.5 text-[11px] leading-relaxed text-slate-400">
-              <p><strong class="text-white">+10 poin</strong> kalau benar.</p>
-              <p><strong class="text-white">+2 poin</strong> tiap streak naik.</p>
-              <p><strong class="text-white">Salah aman</strong>, skor nggak turun. Streak aja yang putus.</p>
-            </div>
-          </div>
-        </aside>
+      <!-- Lifetime Stats Mini Grid (if played before) -->
+      <div v-if="stats.gamesPlayed > 0" class="menu-rise mt-8 grid max-w-md grid-cols-3 gap-3" style="animation-delay: 160ms">
+        <div class="step-card p-3 text-center">
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Skor Tertinggi</p>
+          <p class="mt-0.5 font-mono text-xl font-black text-slate-900 dark:text-white">{{ stats.bestScore }}</p>
+        </div>
+        <div class="step-card p-3 text-center">
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Streak Puncak</p>
+          <p class="mt-0.5 font-mono text-xl font-black text-amber-500">{{ stats.bestStreak }} 🔥</p>
+        </div>
+        <div class="step-card p-3 text-center">
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Sesi</p>
+          <p class="mt-0.5 font-mono text-xl font-black text-sky-600 dark:text-sky-400">{{ stats.gamesPlayed }}</p>
+        </div>
       </div>
     </main>
 
-    <!-- ── Footer ──────────────────────────────────────────────── -->
-    <footer class="relative z-10 border-t border-white/[0.07] px-6 py-4 text-center text-[11px] text-slate-500">
-      Data batas wilayah offline · Dunia, provinsi, kab/kota, sampai kecamatan.
+    <!-- ── Sticky Bottom Cockpit Launch Bar ────────────────────── -->
+    <div class="sticky bottom-0 z-40 mx-auto w-full max-w-[1400px] px-3 pb-3 sm:px-6 sm:pb-4 lg:px-10">
+      <div class="relative overflow-hidden rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-xl transition-all">
+        <!-- Thin top progress line indicating selection completeness -->
+        <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-200 dark:bg-slate-800">
+          <div
+            class="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-300"
+            :style="{ width: `${Math.max(5, Math.min(100, (Math.min(selectedRounds, poolSize) / Math.max(poolSize, 1)) * 100))}%` }"
+          />
+        </div>
+
+        <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 lg:px-6">
+          <div class="min-w-0 flex-1">
+            <p class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+              Ringkasan Misi
+            </p>
+            <dl class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <div class="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+                <dd class="truncate font-semibold text-slate-900 dark:text-white">{{ scopeLabel }}</dd>
+              </div>
+              <span class="text-slate-300 dark:text-slate-700">•</span>
+              <div class="flex items-center gap-1.5">
+                <dt class="text-slate-500 dark:text-slate-400">Mode</dt>
+                <dd class="font-semibold text-slate-900 dark:text-white">{{ modeLabel }}</dd>
+              </div>
+              <span class="text-slate-300 dark:text-slate-700">•</span>
+              <div class="flex items-center gap-1.5">
+                <dt class="text-slate-500 dark:text-slate-400">Ronde</dt>
+                <dd class="font-mono font-semibold text-slate-900 dark:text-white">
+                  {{ Math.min(selectedRounds, poolSize) }}
+                  <span class="text-slate-400 dark:text-slate-500">/ {{ poolSize }} {{ unitLabel }}</span>
+                </dd>
+              </div>
+              <span class="hidden text-slate-300 dark:text-slate-700 sm:inline">•</span>
+              <div class="hidden items-center gap-1.5 sm:flex">
+                <dt class="text-slate-500 dark:text-slate-400">Waktu</dt>
+                <dd class="font-semibold" :class="timerEnabled ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
+                  {{ timerEnabled ? '15 Detik' : 'Santai' }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 sm:justify-end">
+            <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              {{ canStart ? '● Siap Main' : 'Memuat…' }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="!canStart"
+              class="focusable group inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-500/25 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+              @click="start"
+            >
+              <span
+                v-if="pending || mixedPending"
+                class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                aria-hidden="true"
+              />
+              <span>{{ pending || mixedPending ? 'Menyiapkan Peta…' : 'Mulai Main' }}</span>
+              <span class="shadcn-kbd text-[10px] hidden lg:inline-flex bg-white/20 text-white border-white/30">
+                Enter ↵
+              </span>
+              <svg v-if="!pending && !mixedPending" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modern Footer ──────────────────────────────────────── -->
+    <footer class="relative z-10 border-t border-slate-200/80 dark:border-slate-800/80 py-4 text-center font-mono text-xs text-slate-500 dark:text-slate-400">
+      Data batas wilayah offline · 195 Negara, 38 Provinsi, 514 Kab/Kota, 6.644 Kecamatan.
     </footer>
   </div>
 </template>

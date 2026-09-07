@@ -165,30 +165,26 @@ defineExpose({
     >
       <div
         v-if="!map.ready.value"
-        class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-zinc-950/80 backdrop-blur-sm text-xs text-zinc-400"
+        class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-950/75 backdrop-blur-sm text-xs text-slate-300"
       >
-        <div class="h-6 w-6 rounded-full border-2 border-zinc-700 border-t-zinc-200 animate-spin" />
-        <p class="font-medium text-zinc-300">Loading vector map...</p>
+        <div class="h-6 w-6 rounded-full border-2 border-sky-500/20 border-t-sky-400 animate-spin" />
+        <p class="font-medium text-slate-200">Menyiapkan peta…</p>
       </div>
     </Transition>
 
-    <!-- Pemilih mode tampilan peta. Ditaruh di kiri bawah: bilah atas dipakai
-         HUD skor/exit (z lebih tinggi), dan kanan bawah dipakai kontrol zoom. -->
+    <!-- Pemilih mode tampilan peta (kiri bawah) -->
     <div v-if="map.ready.value" class="absolute bottom-24 left-4 z-[1150] sm:bottom-20">
       <button
         type="button"
         aria-label="Mode tampilan peta"
         :aria-expanded="viewMenuOpen"
-        class="focusable flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-md transition"
-        :class="isLightView
-          ? 'border-slate-300 bg-white/90 text-slate-700 hover:bg-white'
-          : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100'"
+        class="focusable flex items-center gap-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 shadow-md backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800"
         @click="viewMenuOpen = !viewMenuOpen"
       >
         <span aria-hidden="true">{{ modes.find(m => m.id === viewMode)?.icon }}</span>
         <span>{{ modes.find(m => m.id === viewMode)?.label }}</span>
         <svg
-          xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform"
+          xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-slate-400 transition-transform"
           :class="viewMenuOpen ? '' : 'rotate-180'"
           viewBox="0 0 20 20" fill="currentColor"
         >
@@ -204,36 +200,29 @@ defineExpose({
       >
         <div
           v-if="viewMenuOpen"
-          class="absolute bottom-full left-0 mb-1.5 w-52 overflow-hidden rounded-xl border shadow-xl backdrop-blur-md"
-          :class="isLightView ? 'border-slate-300 bg-white/95' : 'border-zinc-800 bg-zinc-900/95'"
+          class="absolute bottom-full left-0 mb-1.5 w-52 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-xl backdrop-blur-md p-1"
         >
           <button
             v-for="m in modes"
             :key="m.id"
             type="button"
-            class="focusable flex w-full items-start gap-2.5 px-3 py-2 text-left transition"
+            class="focusable flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition"
             :class="[
               m.id === viewMode
-                ? (isLightView ? 'bg-blue-50' : 'bg-sky-500/15')
-                : (isLightView ? 'hover:bg-slate-100' : 'hover:bg-white/[0.06]'),
+                ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80',
             ]"
             :aria-pressed="m.id === viewMode"
             @click="chooseView(m.id)"
           >
             <span class="mt-px text-sm" aria-hidden="true">{{ m.icon }}</span>
             <span class="min-w-0 flex-1">
-              <span
-                class="block text-[11px] font-semibold"
-                :class="m.id === viewMode
-                  ? (isLightView ? 'text-blue-700' : 'text-sky-300')
-                  : (isLightView ? 'text-slate-700' : 'text-zinc-200')"
-              >{{ m.label }}</span>
-              <span class="block text-[10px]" :class="isLightView ? 'text-slate-500' : 'text-zinc-500'">{{ m.hint }}</span>
+              <span class="block text-[11px] font-semibold">{{ m.label }}</span>
+              <span class="block text-[10px] text-slate-400 dark:text-slate-500">{{ m.hint }}</span>
             </span>
             <span
               v-if="m.id === viewMode"
-              class="mt-0.5 text-[10px] font-bold"
-              :class="isLightView ? 'text-blue-600' : 'text-sky-400'"
+              class="mt-0.5 text-[10px] font-bold text-sky-500"
               aria-hidden="true"
             >✓</span>
           </button>
@@ -241,20 +230,16 @@ defineExpose({
       </Transition>
     </div>
 
-    <!-- Floating Map Controls (shadcn icon button group) -->
+    <!-- Floating Map Controls (icon button group) -->
     <div
       v-if="map.ready.value"
-      class="pointer-events-auto absolute bottom-24 right-4 z-[1050] flex flex-col gap-1 rounded-lg border p-1 shadow-md backdrop-blur-md sm:bottom-20"
-      :class="isLightView ? 'border-slate-300 bg-white/90' : 'border-zinc-800 bg-zinc-900/90'"
+      class="pointer-events-auto absolute bottom-24 right-4 z-[1050] flex flex-col gap-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1 shadow-md backdrop-blur-md sm:bottom-20"
     >
       <button
         type="button"
         title="Zoom In"
         aria-label="Zoom In"
-        class="flex h-7 w-7 items-center justify-center rounded-md transition active:scale-95"
-        :class="isLightView
-          ? 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'
-          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'"
+        class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="zoomIn"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -263,16 +248,13 @@ defineExpose({
         </svg>
       </button>
 
-      <div class="h-px" :class="isLightView ? 'bg-slate-300' : 'bg-zinc-800'" />
+      <div class="h-px bg-slate-200 dark:bg-slate-800" />
 
       <button
         type="button"
         title="Zoom Out"
         aria-label="Zoom Out"
-        class="flex h-7 w-7 items-center justify-center rounded-md transition active:scale-95"
-        :class="isLightView
-          ? 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'
-          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'"
+        class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="zoomOut"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -280,16 +262,13 @@ defineExpose({
         </svg>
       </button>
 
-      <div class="h-px" :class="isLightView ? 'bg-slate-300' : 'bg-zinc-800'" />
+      <div class="h-px bg-slate-200 dark:bg-slate-800" />
 
       <button
         type="button"
         title="Reset Camera"
         aria-label="Reset Camera"
-        class="flex h-7 w-7 items-center justify-center rounded-md transition active:scale-95"
-        :class="isLightView
-          ? 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'
-          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'"
+        class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="resetView"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
