@@ -30,26 +30,26 @@ onMounted(() => {
 <template>
   <div class="pointer-events-none flex flex-wrap items-center gap-2 select-none">
     <!-- Score Badge -->
-    <div class="pointer-events-auto inline-flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-      <span class="text-zinc-400">Score</span>
-      <span class="font-mono font-semibold text-zinc-100">{{ game.score }}</span>
+    <div class="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-lg border border-white/12 bg-slate-950/82 px-3 text-xs font-medium shadow-lg backdrop-blur-md">
+      <span class="text-slate-400">Skor</span>
+      <span class="font-mono font-bold text-white">{{ game.score }}</span>
     </div>
 
     <!-- Round Counter -->
-    <div class="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-      <span class="text-zinc-400">Round</span>
-      <span class="font-mono text-zinc-100 font-semibold">{{ game.currentRound }}</span>
-      <span class="text-zinc-500 font-mono">/</span>
-      <span class="text-zinc-500 font-mono">{{ game.totalRounds }}</span>
+    <div class="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-lg border border-white/12 bg-slate-950/82 px-3 text-xs font-medium shadow-lg backdrop-blur-md">
+      <span class="text-slate-400">Ronde</span>
+      <span class="font-mono text-white font-bold">{{ game.currentRound }}</span>
+      <span class="text-slate-600 font-mono">/</span>
+      <span class="text-slate-500 font-mono">{{ game.totalRounds }}</span>
     </div>
 
     <!-- Streak Badge -->
     <div
       v-if="game.streak > 0"
-      class="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md transition-colors"
+      class="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium shadow-lg backdrop-blur-md transition-colors"
       :class="game.streak >= 3
-        ? 'border-amber-900/50 bg-amber-950/40 text-amber-300'
-        : 'border-zinc-800 bg-zinc-900/90 text-zinc-300'"
+        ? 'border-amber-400/30 bg-amber-950/70 text-amber-200'
+        : 'border-white/12 bg-slate-950/82 text-slate-300'"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -64,10 +64,10 @@ onMounted(() => {
     <!-- Timer Badge -->
     <div
       v-if="game.timerEnabled"
-      class="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-mono font-medium shadow-sm backdrop-blur-md transition-colors"
+      class="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-mono font-medium shadow-lg backdrop-blur-md transition-colors"
       :class="game.secondsLeft <= 5
-        ? 'border-red-900/60 bg-red-950/50 text-red-300 animate-pulse'
-        : 'border-zinc-800 bg-zinc-900/90 text-zinc-300'"
+        ? 'border-red-400/40 bg-red-950/70 text-red-200 animate-pulse'
+        : 'border-white/12 bg-slate-950/82 text-slate-300'"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -80,7 +80,7 @@ onMounted(() => {
     <button
       type="button"
       :title="soundEnabled ? 'Mute' : 'Unmute'"
-      class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/90 text-zinc-400 shadow-sm backdrop-blur-md transition hover:bg-zinc-800 hover:text-zinc-100 active:scale-95"
+      class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/12 bg-slate-950/82 text-slate-400 shadow-lg backdrop-blur-md transition hover:bg-slate-800 hover:text-white active:scale-95"
       @click="toggleSound"
     >
       <svg v-if="soundEnabled" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -99,7 +99,7 @@ onMounted(() => {
     <button
       type="button"
       title="Fullscreen"
-      class="pointer-events-auto hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/90 text-zinc-400 shadow-sm backdrop-blur-md transition hover:bg-zinc-800 hover:text-zinc-100 active:scale-95"
+      class="pointer-events-auto hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/12 bg-slate-950/82 text-slate-400 shadow-lg backdrop-blur-md transition hover:bg-slate-800 hover:text-white active:scale-95"
       @click="toggleFullscreen"
     >
       <svg v-if="!isFullscreen" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

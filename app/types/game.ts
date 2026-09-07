@@ -3,8 +3,10 @@ import type { Feature, FeatureCollection, Geometry } from 'geojson'
 /** Mode permainan. A = cari di peta, B = tebak nama dari outline. */
 export type GameMode = 'A' | 'B'
 
-/** Level data wilayah. MVP hanya 'world'; sisanya disiapkan untuk fase 2. */
-export type RegionLevel = 'world' | 'country' | 'province'
+export type DatasetScope = 'world' | 'id-provinces' | 'id-kabupaten' | 'id-kecamatan' | 'id-mixed'
+
+/** Level data wilayah: world, country, province, district (kecamatan). */
+export type RegionLevel = 'world' | 'country' | 'province' | 'district'
 
 /** Properti minimum yang wajib ada di tiap feature GeoJSON. */
 export interface RegionProperties {
@@ -13,6 +15,8 @@ export interface RegionProperties {
   iso_a2: string | null
   region: string
   subregion?: string
+  /** Ada di dataset kabupaten & kecamatan; dipakai untuk mewarnai backdrop peta. */
+  country?: string
 }
 
 export type RegionFeature = Feature<Geometry, RegionProperties>
@@ -26,6 +30,14 @@ export interface RegionItem {
   nameId: string
   region: string
   iso?: string | null
+  /**
+   * Level administratif item ini. Hanya diisi di mode campuran, di mana satu
+   * pool memuat provinsi, kabupaten, dan kecamatan sekaligus — peta perlu tahu
+   * koleksi mana yang harus ditampilkan untuk ronde ini.
+   */
+  level?: RegionLevel
+  /** Kota asal item kecamatan, supaya file-nya bisa dimuat ulang. */
+  cityId?: string
 }
 
 /** Hasil satu ronde, untuk hitung akurasi di result screen. */

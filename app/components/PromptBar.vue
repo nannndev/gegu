@@ -48,46 +48,81 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
+/**
+ * Mode campuran berganti level tiap ronde, jadi pemain harus diberi tahu
+ * tingkat apa yang sedang ditanyakan — tanpa itu "Malang" ambigu antara
+ * kabupaten dan kecamatan.
+ */
+const mixedLevelLabel = computed(() => {
+  const level = game.currentTarget?.level
+  if (level === 'district') return 'Kecamatan'
+  if (level === 'country') return 'Kabupaten / Kota'
+  return 'Provinsi'
+})
+
+const isMixed = computed(() => game.datasetScope === 'id-mixed')
+
 const challengeBadge = computed(() => {
+  if (isMixed.value) {
+    return `Campuran · ${mixedLevelLabel.value}`
+  }
+  if (game.datasetScope === 'id-kecamatan') {
+    return `${game.cityName || 'Kota'} · Kecamatan`
+  }
   if (game.datasetScope === 'id-kabupaten') {
-    return `${game.provinceName || 'Province'} Drill-Down`
+    return `${game.provinceName || 'Provinsi'} · Kab/Kota`
   }
   if (game.datasetScope === 'id-provinces') {
-    return 'Indonesia Provinces Challenge'
+    return 'Indonesia · Provinsi'
   }
-  return 'Global Pinpoint Challenge'
+  return 'Dunia'
 })
 
 const modeAInstruction = computed(() => {
+  if (isMixed.value) {
+    const level = game.currentTarget?.level
+    if (level === 'district') return `Klik Kecamatan ${game.currentTarget?.name} di peta.`
+    if (level === 'country') return `Klik ${game.currentTarget?.name} di peta Indonesia.`
+    return `Klik Provinsi ${game.currentTarget?.name} di peta Indonesia.`
+  }
+  if (game.datasetScope === 'id-kecamatan') {
+    return `Cari Kecamatan ${game.currentTarget?.name}, terus klik areanya.`
+  }
   if (game.datasetScope === 'id-kabupaten') {
-    return `Locate and click ${game.currentTarget?.name} in ${game.provinceName || 'this region'}.`
+    return `Cari ${game.currentTarget?.name}, terus klik areanya.`
   }
   if (game.datasetScope === 'id-provinces') {
-    return 'Locate and click this province on the map of Indonesia.'
+    return 'Klik provinsi ini di peta Indonesia.'
   }
-  return 'Find and click this country directly on the world map.'
+  return 'Klik negara ini di peta dunia.'
 })
 
 const modeBQuestion = computed(() => {
+  if (isMixed.value) {
+    return `Yang disorot kuning itu ${mixedLevelLabel.value} apa?`
+  }
+  if (game.datasetScope === 'id-kecamatan') {
+    return `Kecamatan apa yang lagi disorot di ${game.cityName || 'kota ini'}?`
+  }
   if (game.datasetScope === 'id-kabupaten') {
-    return `Which city / regency in ${game.provinceName || 'this region'} is highlighted in yellow?`
+    return `Kab/kota apa yang lagi disorot di ${game.provinceName || 'wilayah ini'}?`
   }
   if (game.datasetScope === 'id-provinces') {
-    return 'Which Indonesian province is highlighted in yellow on the map?'
+    return 'Provinsi apa yang lagi disorot?'
   }
-  return 'Which territory is highlighted in yellow on the map?'
+  return 'Wilayah apa yang lagi disorot?'
 })
 </script>
 
 <template>
-  <div class="rounded-2xl border border-white/15 bg-slate-900/90 p-4 sm:p-5 shadow-2xl backdrop-blur-xl">
+  <div class="rounded-2xl border border-white/15 bg-slate-950/88 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-5">
     <!-- Mode A: Locate Country / Province / City on Map -->
     <template v-if="game.mode === 'A'">
       <div class="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
         <div class="flex items-center gap-2">
           <span
             class="inline-flex h-2 w-2 rounded-full animate-pulse"
-            :class="game.datasetScope === 'world' ? 'bg-sky-400' : 'bg-rose-400'"
+            :class="game.datasetScope === 'world' ? 'bg-sky-400' : isMixed ? 'bg-violet-400' : 'bg-rose-400'"
           />
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300">
             {{ challengeBadge }}
@@ -113,7 +148,7 @@ const modeBQuestion = computed(() => {
             <span class="text-2xl select-none" aria-hidden="true">
               {{ game.datasetScope === 'world' ? (isoToFlag(game.currentTarget?.iso) || '🌐') : '🇮🇩' }}
             </span>
-            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-sm">
+            <h2 class="text-xl sm:text-2xl font-black text-white drop-shadow-sm">
               {{ game.currentTarget?.name }}
             </h2>
           </div>
@@ -138,7 +173,7 @@ const modeBQuestion = computed(() => {
         </span>
       </div>
 
-      <p class="mt-2.5 text-xs sm:text-sm font-semibold text-white">
+      <p class="mt-2.5 text-sm font-semibold text-white sm:text-base">
         {{ modeBQuestion }}
       </p>
 
@@ -148,7 +183,7 @@ const modeBQuestion = computed(() => {
           :key="choice.id"
           type="button"
           :disabled="answered"
-          class="group flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition-all disabled:cursor-default active:scale-98"
+          class="group flex min-h-11 items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition-all disabled:cursor-default active:scale-98"
           :class="choiceClass(choice)"
           @click="emit('answer', choice)"
         >
@@ -165,13 +200,13 @@ const modeBQuestion = computed(() => {
             v-if="answered && choice.id === game.currentTarget?.id"
             class="shrink-0 text-emerald-400 font-bold text-xs"
           >
-            ✓ Correct
+            Benar
           </span>
           <span
             v-else-if="answered && choice.id === game.lastAnswerId"
             class="shrink-0 text-rose-400 font-bold text-xs"
           >
-            ✗ Missed
+            Meleset
           </span>
         </button>
       </div>

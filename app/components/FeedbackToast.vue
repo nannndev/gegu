@@ -9,12 +9,12 @@ const fb = computed(() => game.feedback)
 const headline = computed(() => {
   if (!fb.value) return ''
   if (fb.value.kind === 'correct') {
-    return `Correct (+${fb.value.points} pts)`
+    return `Benar (+${fb.value.points} poin)`
   }
   if (fb.value.kind === 'timeout') {
-    return "Time Expired"
+    return 'Kehabisan waktu'
   }
-  return 'Incorrect'
+  return 'Kurang pas'
 })
 
 const isLast = computed(() => game.currentRound >= game.totalRounds)
@@ -39,18 +39,18 @@ onBeforeUnmount(() => {
 <template>
   <div
     v-if="fb"
-    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all"
+    class="flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl shadow-black/40 backdrop-blur-md transition-all sm:flex-row sm:items-center"
     :class="fb.kind === 'correct'
-      ? 'border-emerald-900/60 bg-zinc-900/95'
-      : 'border-red-900/60 bg-zinc-900/95'"
+      ? 'border-emerald-400/30 bg-slate-950/92'
+      : 'border-red-400/30 bg-slate-950/92'"
   >
     <div class="flex items-start gap-3 min-w-0">
       <!-- Status Icon -->
       <div
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm"
         :class="fb.kind === 'correct'
-          ? 'border-emerald-800/80 bg-emerald-950/60 text-emerald-400'
-          : 'border-red-800/80 bg-red-950/60 text-red-400'"
+          ? 'border-emerald-400/40 bg-emerald-950/70 text-emerald-300'
+          : 'border-red-400/40 bg-red-950/70 text-red-300'"
       >
         <svg v-if="fb.kind === 'correct'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12" />
@@ -75,14 +75,14 @@ onBeforeUnmount(() => {
 
         <p class="mt-0.5 text-xs text-zinc-300">
           <template v-if="fb.kind === 'correct'">
-            {{ fb.targetName }} located accurately.
+            Yup, itu {{ fb.targetName }}.
           </template>
           <template v-else>
             <span v-if="fb.answerName" class="text-zinc-400">
-              You selected <span class="text-zinc-200 line-through">{{ fb.answerName }}</span>.
+              Kamu pilih <span class="text-zinc-200 line-through">{{ fb.answerName }}</span>.
             </span>
             <span>
-              Target was <strong class="text-zinc-100">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
+              Yang bener <strong class="text-zinc-100">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
             </span>
           </template>
         </p>
@@ -92,10 +92,10 @@ onBeforeUnmount(() => {
     <!-- Action Button (shadcn button) -->
     <button
       type="button"
-      class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-zinc-100 px-3 text-xs font-medium text-zinc-900 transition hover:bg-zinc-200 active:scale-98 shrink-0"
+      class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-4 text-xs font-bold text-slate-950 transition hover:bg-slate-200 active:scale-98"
       @click="emit('next')"
     >
-      <span>{{ isLast ? 'View Results' : 'Next Round' }}</span>
+      <span>{{ isLast ? 'Lihat Skor' : 'Lanjut' }}</span>
       <kbd class="hidden sm:inline-flex h-4 items-center rounded border border-zinc-300 bg-zinc-200 px-1 font-mono text-[9px] text-zinc-800">
         Space ↵
       </kbd>

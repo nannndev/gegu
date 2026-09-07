@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Feedback, GameMode, RegionItem, RoundResult } from '~/types/game'
+import type { Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 
 export const TOTAL_ROUNDS = 10
 export const ROUND_SECONDS = 15
@@ -29,14 +29,16 @@ interface StartOptions {
   regionFilter?: string
   timerEnabled?: boolean
   roundsCount?: number
-  scope?: 'world' | 'id-provinces' | 'id-kabupaten'
+  scope?: DatasetScope
   provinceName?: string
+  cityName?: string
 }
 
 export const useGameStore = defineStore('game', () => {
   const mode = ref<GameMode>('A')
-  const datasetScope = ref<'world' | 'id-provinces' | 'id-kabupaten'>('world')
+  const datasetScope = ref<DatasetScope>('world')
   const provinceName = ref<string>('')
+  const cityName = ref<string>('')
   const regionFilter = ref('all')
   const timerEnabled = ref(false)
   const preferredRounds = ref(TOTAL_ROUNDS)
@@ -85,7 +87,13 @@ export const useGameStore = defineStore('game', () => {
     secondsLeft.value = ROUND_SECONDS
   }
 
-  /** Ambil target acak yang belum pernah keluar. Pool di-refill kalau habis. */
+  /**
+   * Ambil target acak yang belum pernah keluar. Pool di-refill kalau habis.
+   *
+   * Mode campuran mengundi levelnya lebih dulu, baru wilayahnya. Kalau langsung
+   * mengundi dari pool, kabupaten/kota (514 item) mengisi ±85% undian dan
+   * provinsi cuma 6% — "campuran" jadi terasa seperti mode kabupaten saja.
+   */
   function pickTarget(): RegionItem | null {
     if (!pool.value.length) return null
     let remaining = pool.value.filter(i => !usedIds.value.includes(i.id))
@@ -93,12 +101,30 @@ export const useGameStore = defineStore('game', () => {
       usedIds.value = []
       remaining = pool.value
     }
+
+    if (datasetScope.value === 'id-mixed') {
+      const levels = [...new Set(remaining.map(i => i.level).filter(Boolean))]
+      if (levels.length > 1) {
+        const level = levels[Math.floor(Math.random() * levels.length)]
+        const sameLevel = remaining.filter(i => i.level === level)
+        if (sameLevel.length) remaining = sameLevel
+      }
+    }
+
     return remaining[Math.floor(Math.random() * remaining.length)] ?? null
   }
 
   /** 1 jawaban benar + 3 distraktor, diutamakan dari region yang sama. */
   function buildChoices(target: RegionItem): RegionItem[] {
-    const others = pool.value.filter(i => i.id !== target.id)
+    let others = pool.value.filter(i => i.id !== target.id)
+
+    // Mode campuran: distraktor harus selevel target. Tanpa ini, soal
+    // kecamatan bisa berpilihan provinsi — jawabannya jadi terlalu jelas.
+    if (target.level) {
+      const sameLevel = others.filter(i => i.level === target.level)
+      if (sameLevel.length >= CHOICE_COUNT - 1) others = sameLevel
+    }
+
     const sameRegion = shuffle(others.filter(i => i.region === target.region))
     const rest = shuffle(others.filter(i => i.region !== target.region))
     const distractors = [...sameRegion, ...rest].slice(0, CHOICE_COUNT - 1)
@@ -129,6 +155,7 @@ export const useGameStore = defineStore('game', () => {
     mode.value = options.mode
     datasetScope.value = options.scope ?? 'world'
     provinceName.value = options.provinceName ?? ''
+    cityName.value = options.cityName ?? ''
     regionFilter.value = options.regionFilter ?? 'all'
     timerEnabled.value = options.timerEnabled ?? false
     preferredRounds.value = options.roundsCount ?? TOTAL_ROUNDS

@@ -10,6 +10,8 @@ const mapRef = ref<{
   resetStyles: () => void
   fitRegion: (id: string) => void
   fitPool: (items: RegionItem[]) => void
+  fitSameLevel: (target: RegionItem) => void
+  roundReady?: { value: boolean }
   resetView: () => void
   setInteractive: (v: boolean) => void
 } | null>(null)
@@ -19,8 +21,12 @@ if (game.phase === 'idle') {
 }
 
 const targetScope = game.datasetScope || 'world'
-const targetLevel = targetScope === 'world' ? 'world' : 'province'
-await load(targetLevel, targetScope)
+// Mode campuran memuat koleksinya per ronde di MapView (levelnya berganti),
+// jadi tidak ada satu scope yang bisa dimuat di muka.
+if (targetScope !== 'id-mixed') {
+  const targetLevel = targetScope === 'world' ? 'world' : targetScope === 'id-kecamatan' ? 'district' : 'province'
+  await load(targetLevel, targetScope)
+}
 
 const mapReady = ref(false)
 const showExitModal = ref(false)
@@ -30,30 +36,37 @@ function renderRound() {
   const map = mapRef.value
   const target = game.currentTarget
   if (!map || !mapReady.value || !target) return
+  // Mode campuran memuat koleksinya per ronde; menggambar sebelum layer-nya
+  // siap membuat wilayah soal tidak tersorot dan tidak bisa diklik.
+  if (map.roundReady?.value === false) return
 
   map.resetStyles()
+
+  // Mode campuran: kamera mengikuti wilayah soal, karena pool berisi
+  // beberapa level sekaligus dan fitPool akan zoom keluar terlalu jauh.
+  const isMixed = game.datasetScope === 'id-mixed'
+  const isLocal = game.datasetScope === 'id-kabupaten' || game.datasetScope === 'id-kecamatan'
+
   if (game.mode === 'B') {
     map.setInteractive(false)
     map.mark(target.id, 'target')
-    if (game.datasetScope === 'id-kabupaten') {
-      map.fitPool(game.pool)
-    }
-    else {
-      map.fitRegion(target.id)
-    }
+    if (isMixed) map.fitRegion(target.id)
+    else if (isLocal) map.fitPool(game.pool)
+    else map.fitRegion(target.id)
   }
   else {
     map.setInteractive(true)
-    if (game.datasetScope === 'id-kabupaten') {
-      map.fitPool(game.pool)
-    }
-    else {
-      map.resetView()
-    }
+    if (isMixed) map.fitSameLevel(target)
+    else if (isLocal) map.fitPool(game.pool)
+    else map.resetView()
   }
 }
 
-watch([() => game.currentRound, mapReady], renderRound, { immediate: true })
+watch(
+  [() => game.currentRound, mapReady, () => mapRef.value?.roundReady?.value],
+  renderRound,
+  { immediate: true },
+)
 
 function onMapReady() {
   mapReady.value = true
@@ -96,7 +109,7 @@ function answer(item: RegionItem | null) {
 
   if (item && item.id !== target.id) map.mark(item.id, 'wrong')
   map.mark(target.id, 'correct')
-  if (game.mode === 'A' && game.datasetScope !== 'id-kabupaten') map.fitRegion(target.id)
+  if (game.mode === 'A' && game.datasetScope !== 'id-kabupaten' && game.datasetScope !== 'id-kecamatan') map.fitRegion(target.id)
 }
 
 function next() {
@@ -142,7 +155,7 @@ watch(() => game.phase, (phase) => {
   if (!map || !target) return
   map.setInteractive(false)
   map.mark(target.id, 'correct')
-  if (game.mode === 'A' && game.datasetScope !== 'id-kabupaten') map.fitRegion(target.id)
+  if (game.mode === 'A' && game.datasetScope !== 'id-kabupaten' && game.datasetScope !== 'id-kecamatan') map.fitRegion(target.id)
 })
 
 function confirmQuit() {
@@ -152,7 +165,7 @@ function confirmQuit() {
 </script>
 
 <template>
-  <main class="relative h-dvh w-full overflow-hidden select-none bg-zinc-950">
+  <main class="relative h-dvh w-full overflow-hidden select-none">
     <MapView ref="mapRef" @pick="onPick" @miss="onMiss" @ready="onMapReady" />
 
     <!-- Top Navigation HUD Bar -->
@@ -168,7 +181,7 @@ function confirmQuit() {
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
-        <span>Exit</span>
+        <span>Keluar</span>
         <kbd class="hidden sm:inline-block rounded border border-zinc-700 bg-zinc-800 px-1 py-0.2 font-mono text-[9px] text-zinc-400">
           Esc
         </kbd>
@@ -196,9 +209,9 @@ function confirmQuit() {
         @click.self="showExitModal = false"
       >
         <div class="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
-          <h3 class="text-base font-semibold text-zinc-100">Exit Current Session?</h3>
+          <h3 class="text-base font-semibold text-zinc-100">Keluar dari sesi?</h3>
           <p class="mt-2 text-xs text-zinc-400 leading-relaxed">
-            Your ongoing round, streak multiplier, and session score will be forfeited.
+            Ronde ini berhenti dan skor sesi nggak disimpan.
           </p>
 
           <div class="mt-6 flex items-center justify-end gap-2">
@@ -207,14 +220,14 @@ function confirmQuit() {
               class="inline-flex h-8 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
               @click="showExitModal = false"
             >
-              Cancel
+              Lanjut main
             </button>
             <button
               type="button"
               class="inline-flex h-8 items-center justify-center rounded-lg bg-red-600 px-3 text-xs font-medium text-white transition hover:bg-red-700 active:scale-95"
               @click="confirmQuit"
             >
-              Exit Session
+              Keluar
             </button>
           </div>
         </div>
