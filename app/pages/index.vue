@@ -10,6 +10,7 @@ const {
   availableCities,
   kecamatanProvinces,
   activeKecamatanCity,
+  worldContext,
   pending,
   error,
   load,
@@ -182,15 +183,27 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="relative flex min-h-dvh flex-col bg-slate-50 dark:bg-[#080b11] text-slate-900 dark:text-slate-100 selection:bg-sky-500/20 selection:text-sky-600 dark:selection:text-sky-400 cool-grid-bg transition-colors duration-200">
-    <!-- Ambient glowing light backdrop -->
-    <div
-      class="pointer-events-none fixed inset-0 transition-opacity duration-700"
-      :class="setup.primaryScope.value === 'world' ? 'bg-ambient-glow' : 'bg-ambient-indonesia'"
-    />
+  <div class="relative flex min-h-dvh flex-col bg-slate-50 dark:bg-[#080b11] text-slate-900 dark:text-slate-100 selection:bg-sky-500/20 selection:text-sky-600 dark:selection:text-sky-400 transition-colors duration-200">
+    <!--
+      Latar peta dunia. Ditaruh di lapisan paling bawah dan tidak bisa diklik;
+      kartu-kartu di atasnya memakai efek kaca, jadi peta ini yang terlihat
+      menembus. Highlight-nya mengikuti negara/wilayah yang sedang dipilih.
+    -->
+    <div class="pointer-events-none fixed inset-0 overflow-hidden">
+      <WorldMapBackdrop
+        :collection="worldContext"
+        :highlight-iso="setup.primaryScope.value === 'indonesia' ? 'ID' : null"
+      />
+      <!-- Vignette: menggelapkan tepi supaya teks di tengah tetap kontras. -->
+      <div class="backdrop-vignette absolute inset-0" />
+      <div
+        class="absolute inset-0 transition-opacity duration-700"
+        :class="setup.primaryScope.value === 'world' ? 'bg-ambient-glow' : 'bg-ambient-indonesia'"
+      />
+    </div>
 
     <!-- ── Header ─────────────────────────────────────────────── -->
-    <header class="sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-[#080b11]/80 backdrop-blur-md">
+    <header class="sticky top-0 z-30 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/55 dark:bg-[#080b11]/55 backdrop-blur-xl backdrop-saturate-150">
       <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
         <div class="flex min-w-0 items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 via-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20 ring-1 ring-white/20">
@@ -826,7 +839,7 @@ onBeforeUnmount(() => {
 
     <!-- ── Launch bar ─────────────────────────────────────────── -->
     <div class="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-6 sm:pb-4 lg:px-10">
-      <div class="relative mx-auto w-full max-w-[1400px] overflow-hidden rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-xl">
+      <div class="relative mx-auto w-full max-w-[1400px] overflow-hidden rounded-2xl border border-white/70 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 shadow-2xl backdrop-blur-2xl backdrop-saturate-150">
         <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-200 dark:bg-slate-800">
           <div
             class="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-300"

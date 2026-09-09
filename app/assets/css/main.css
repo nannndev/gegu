@@ -30,33 +30,71 @@
 /**
  * Token permukaan. Nilainya ditulis sekali per tema di sini, jadi kartu dan
  * panel tidak perlu memasangkan `bg-white dark:bg-slate-900` di tiap tempat.
+ *
+ * Alpha-nya sengaja rendah: ada peta dunia di belakang halaman, dan kartu opak
+ * akan menutupinya sepenuhnya. Yang menjaga teks tetap kebaca adalah blur
+ * (`--glass-blur`) plus highlight `inset` di dalam shadow — bukan opasitas.
  */
 :root {
   --surface-page: #f8fafc;
-  --surface-card: rgb(255 255 255 / 0.85);
-  --surface-raised: rgb(248 250 252 / 0.9);
-  --surface-sunken: rgb(241 245 249 / 0.9);
-  --surface-hover: rgb(241 245 249 / 0.95);
-  --border-subtle: rgb(226 232 240 / 0.9);
-  --border-strong: rgb(203 213 225 / 0.9);
-  --shadow-card: 0 4px 20px -4px rgb(0 0 0 / 0.05);
-  --shadow-lifted: 0 10px 30px -8px rgb(0 0 0 / 0.08);
+  --surface-card: rgb(255 255 255 / 0.62);
+  --surface-raised: rgb(255 255 255 / 0.5);
+  --surface-sunken: rgb(241 245 249 / 0.6);
+  --surface-hover: rgb(255 255 255 / 0.78);
+  --border-subtle: rgb(255 255 255 / 0.7);
+  --border-strong: rgb(203 213 225 / 0.8);
+  --shadow-card:
+    0 4px 24px -6px rgb(15 23 42 / 0.1),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.6);
+  --shadow-lifted:
+    0 12px 36px -10px rgb(15 23 42 / 0.16),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.65);
+  --glass-blur: 20px;
   --accent: #0284c7;
   --accent-soft: rgb(14 165 233 / 0.1);
 }
 
 .dark {
   --surface-page: #080b11;
-  --surface-card: rgb(15 23 42 / 0.65);
-  --surface-raised: rgb(15 23 42 / 0.5);
-  --surface-sunken: rgb(8 11 17 / 0.8);
-  --surface-hover: rgb(30 41 59 / 0.7);
-  --border-subtle: rgb(255 255 255 / 0.08);
-  --border-strong: rgb(255 255 255 / 0.14);
-  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.5);
-  --shadow-lifted: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --surface-card: rgb(15 23 42 / 0.55);
+  --surface-raised: rgb(15 23 42 / 0.42);
+  --surface-sunken: rgb(8 11 17 / 0.6);
+  --surface-hover: rgb(30 41 59 / 0.62);
+  --border-subtle: rgb(255 255 255 / 0.1);
+  --border-strong: rgb(255 255 255 / 0.16);
+  --shadow-card:
+    0 8px 32px -8px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.07);
+  --shadow-lifted:
+    0 16px 44px -12px rgb(0 0 0 / 0.65),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.09);
   --accent: #38bdf8;
   --accent-soft: rgb(14 165 233 / 0.15);
+}
+
+/*
+ * Vignette latar. Gradiennya baru mulai menutup di 62% supaya bagian tengah
+ * peta tetap berwarna — keterbacaan teks sudah ditangani oleh blur kartu di
+ * atasnya, jadi vignette di sini hanya meredam tepi yang tidak tertutup kartu.
+ */
+.backdrop-vignette {
+  background: radial-gradient(
+    ellipse 105% 85% at 50% 42%,
+    transparent 0%,
+    transparent 62%,
+    rgb(248 250 252 / 0.55) 88%,
+    rgb(248 250 252 / 0.8) 100%
+  );
+}
+
+.dark .backdrop-vignette {
+  background: radial-gradient(
+    ellipse 105% 85% at 50% 42%,
+    transparent 0%,
+    transparent 62%,
+    rgb(8 11 17 / 0.6) 88%,
+    rgb(8 11 17 / 0.85) 100%
+  );
 }
 
 html,
@@ -91,26 +129,23 @@ body {
   background: radial-gradient(circle at 50% -10%, rgba(244, 63, 94, 0.16) 0%, rgba(245, 158, 11, 0.07) 40%, transparent 70%);
 }
 
-/* Topographic / Grid subtle background pattern */
-.cool-grid-bg {
-  background-image: radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.15) 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-.dark .cool-grid-bg {
-  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-/* Glassmorphic step card */
+/*
+ * Kartu kaca. `saturate` ikut dinaikkan bersama blur: tanpa itu warna bendera
+ * dari peta di belakang jadi pucat kelabu dan efeknya terlihat seperti kaca
+ * susu biasa, bukan kaca bening.
+ */
 .step-card {
   position: relative;
   border-radius: 1rem;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  background: var(--surface-card);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+  /* `background-color`, bukan shorthand — lihat catatan kilau spekular. */
+  background-color: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   box-shadow: var(--shadow-card);
 }
 
@@ -119,12 +154,43 @@ body {
   z-index: 35;
 }
 
+/*
+ * Kilau spekular di tepi atas — garis terang tipis yang membuat permukaannya
+ * terbaca sebagai kaca melengkung, bukan kotak transparan.
+ *
+ * Dipasang sebagai lapisan `background-image`, bukan pseudo-element bertumpuk.
+ * Pseudo-element menuntut isi kartu diangkat dengan `z-index`, dan itu
+ * memerangkap dropdown `SearchSelect` di dalam stacking context anak —
+ * dropdown di kartu bagian atas jadi ketimpa elemen di bawahnya.
+ */
+.step-card,
+.raycast-card {
+  background-image: linear-gradient(
+    160deg,
+    rgb(255 255 255 / 0.5) 0%,
+    rgb(255 255 255 / 0.08) 22%,
+    transparent 45%
+  );
+}
+
+.dark .step-card,
+.dark .raycast-card {
+  background-image: linear-gradient(
+    160deg,
+    rgb(255 255 255 / 0.12) 0%,
+    rgb(255 255 255 / 0.03) 22%,
+    transparent 45%
+  );
+}
+
 /* Selectable mode / option card */
 .pick-card {
   position: relative;
   border-radius: 0.875rem;
   border: 1px solid var(--border-subtle);
   background: var(--surface-raised);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
   text-align: left;
   transition:
     border-color 0.18s ease,
@@ -156,6 +222,8 @@ body {
   border-radius: 0.75rem;
   border: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 0.25rem;
 }
 
@@ -293,18 +361,31 @@ body {
     0 0 0 64px rgba(99, 102, 241, 0.03);
 }
 
-/* Glass Raycast card */
+/*
+ * Kartu kaca yang melayang di atas peta permainan (prompt & feedback).
+ *
+ * Permukaannya lebih pekat daripada kartu di menu: yang di belakangnya bukan
+ * latar dekoratif, tapi poligon soal yang berwarna penuh dan gampang membuat
+ * teks pertanyaan tidak kebaca.
+ */
+/*
+ * `background-color`, bukan shorthand `background`: aturan kilau spekular di
+ * atas memasang `background-image`, dan shorthand di sini akan menghapusnya.
+ */
 .raycast-card {
-  background: var(--surface-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  position: relative;
+  background-color: rgb(255 255 255 / 0.88);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-lifted);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .dark .raycast-card {
-  background: rgb(15 23 42 / 0.75);
+  background-color: rgb(15 23 42 / 0.8);
 }
 
 .raycast-card:hover {

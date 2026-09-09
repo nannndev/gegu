@@ -203,6 +203,8 @@ export const FLAG_FILLS: Record<string, FlagFill> = {
   VU: { fill: '#2e3f27' }, // hitam-kuning-hijau
   NC: { fill: '#c0392b' }, // merah-biru-kuning
   // Lainnya / wilayah
+  BT: { fill: '#c9a24b' }, // kuning-oranye, naga putih
+  GQ: { fill: '#2e8b57' }, // hijau-putih-merah
   GL: { fill: '#e8e0d0' }, // putih-merah
   FK: { fill: '#2b4a8c' },
   PR: { fill: '#c0392b' }, // merah-putih-biru
