@@ -114,7 +114,9 @@ function answer(item: RegionItem | null) {
 
 function next() {
   if (game.currentRound >= game.totalRounds) {
-    game.phase = 'finished'
+    // Lewat store, bukan `phase = 'finished'` langsung: di situlah rekor
+    // dan hasil tantangan harian dicatat.
+    game.finishGame()
     return navigateTo('/result')
   }
   game.nextRound()

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 const { initTheme } = useTheme()
 
-onMounted(() => {
-  initTheme()
-})
+// Tema dipasang sebelum paint pertama oleh skrip inline di nuxt.config; ini
+// menyelaraskan state Vue dengan kelas yang sudah ada di <html>.
+initTheme()
 </script>
 
 <template>

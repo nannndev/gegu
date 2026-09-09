@@ -30,6 +30,15 @@ export default defineNuxtConfig({
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap' },
       ],
+      script: [
+        {
+          // Pasang kelas tema sebelum paint pertama. Tanpa ini aplikasi selalu
+          // memakai warna default dulu, lalu berkedip ke tema pilihan pemain
+          // setelah bundel Vue jalan.
+          innerHTML: `(function(){try{var p=localStorage.getItem('geoguess_theme');var d=p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.dataset.theme=d?'dark':'light';r.style.colorScheme=d?'dark':'light'}catch(e){}})()`,
+          tagPosition: 'head',
+        },
+      ],
     },
   },
 })

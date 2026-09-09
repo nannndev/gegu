@@ -47,14 +47,20 @@ onBeforeUnmount(() => {
 function playAgain() {
   playClick()
   const mode = game.mode
-  const pool = game.pool
-  const regionFilter = game.regionFilter
-  const timerEnabled = game.timerEnabled
-  const roundsCount = game.totalRounds
-  const scope = game.datasetScope
-  const provinceName = game.provinceName
-  const cityName = game.cityName
-  game.startGame({ mode, pool, regionFilter, timerEnabled, roundsCount, scope, provinceName, cityName })
+  game.startGame({
+    mode,
+    pool: game.pool,
+    regionFilter: game.regionFilter,
+    timerEnabled: game.timerEnabled,
+    roundsCount: game.totalRounds,
+    scope: game.datasetScope,
+    provinceName: game.provinceName,
+    cityName: game.cityName,
+    scopeKey: game.scopeKey,
+    scopeLabel: game.scopeLabel,
+    // Ulangan tidak dihitung sebagai tantangan harian lagi — hasil harian
+    // hanya boleh dicatat sekali per hari.
+  })
   navigateTo({ path: '/play', query: { mode } })
 }
 
@@ -64,24 +70,35 @@ function toHome() {
   navigateTo('/')
 }
 
+/** Label cakupan; dipakai di header dan teks yang disalin. */
+const scopeLabel = computed(() => {
+  if (game.scopeLabel) return game.scopeLabel
+  if (game.datasetScope === 'id-kecamatan') return `${game.cityName || 'Kota'} · Kecamatan`
+  if (game.datasetScope === 'id-kabupaten') return `${game.provinceName || 'Provinsi'} · Kab/Kota`
+  if (game.datasetScope === 'id-provinces') return 'Indonesia · 38 Provinsi'
+  return game.regionFilter === 'all' ? 'Seluruh Dunia' : game.regionFilter
+})
+
+/**
+ * Ringkasan ronde sebagai deret emoji, biar hasil yang disalin langsung
+ * kebaca di chat tanpa harus membuka tabelnya.
+ */
+const resultSquares = computed(() =>
+  game.history.map(h => (h.correct ? '🟩' : '🟥')).join(''),
+)
+
 async function shareResults() {
   playClick()
   const modeName = game.mode === 'A' ? 'Klik peta' : 'Pilih nama'
-  const scopeLabel = game.datasetScope === 'id-kecamatan'
-    ? `${game.cityName || 'Kota'} · Kecamatan`
-    : game.datasetScope === 'id-kabupaten'
-    ? `${game.provinceName || 'Provinsi'} · Kab/Kota`
-    : game.datasetScope === 'id-provinces'
-    ? 'Indonesia · 38 provinsi'
-    : (game.regionFilter === 'all' ? 'Dunia' : game.regionFilter)
-  const text = [
-    `Hasil main GeoGuesser`,
-    `${rank.value.title}`,
-    `Skor: ${game.score} poin`,
-    `Benar: ${game.correctCount}/${game.history.length} (${game.accuracy}%)`,
-    `Streak: ${game.bestStreak}`,
-    `Mode: ${modeName} (${scopeLabel})`,
-  ].join('\n')
+  const lines = [
+    game.dailyKey ? `GeoGuesser · Tantangan ${game.dailyKey}` : 'Hasil main GeoGuesser',
+    rank.value.title,
+    resultSquares.value,
+    `Skor: ${game.score} poin · Akurasi ${game.accuracy}%`,
+    `Benar: ${game.correctCount}/${game.history.length} · Streak ${game.bestStreak}`,
+    `Mode: ${modeName} (${scopeLabel.value})`,
+  ]
+  const text = lines.filter(Boolean).join('\n')
 
   try {
     if (navigator.clipboard) {
@@ -110,8 +127,14 @@ async function shareResults() {
               <span class="rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
                 {{ rank.icon }} {{ rank.badge }}
               </span>
+              <span
+                v-if="game.dailyKey"
+                class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400"
+              >
+                🎯 Harian {{ game.dailyKey }}
+              </span>
               <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Mode {{ game.mode }} · {{ game.datasetScope === 'id-kecamatan' ? `🇮🇩 ${game.cityName || 'Kota'} · Kecamatan` : game.datasetScope === 'id-kabupaten' ? `🇮🇩 ${game.provinceName || 'Provinsi'} · Kab/Kota` : game.datasetScope === 'id-provinces' ? '🇮🇩 38 provinsi' : (game.regionFilter === 'all' ? 'Dunia' : game.regionFilter) }}
+                {{ game.mode === 'A' ? 'Klik peta' : 'Pilih nama' }} · {{ scopeLabel }}
               </span>
             </div>
 
@@ -131,8 +154,18 @@ async function shareResults() {
           </div>
         </div>
 
+        <!-- Ringkasan per ronde sebagai deret kotak -->
+        <div class="flex flex-wrap gap-1 pt-6" role="img" :aria-label="`${game.correctCount} benar dari ${game.history.length} ronde`">
+          <span
+            v-for="row in game.history"
+            :key="row.round"
+            class="h-2.5 w-6 rounded-full"
+            :class="row.correct ? 'bg-emerald-500' : 'bg-rose-500/70'"
+          />
+        </div>
+
         <!-- Metrics Grid -->
-        <div class="grid grid-cols-3 gap-3 pt-6">
+        <div class="grid grid-cols-3 gap-3 pt-5">
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/40 p-3.5 text-center">
             <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Akurasi</span>
             <span class="mt-1 block font-mono text-2xl font-black text-slate-900 dark:text-white">

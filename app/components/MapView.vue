@@ -17,6 +17,7 @@ const {
   loadRegionSet,
 } = useGeoData()
 const { mode: viewMode, setMode, modes } = useMapViewMode()
+const { isDark } = useTheme()
 const container = ref<HTMLElement | null>(null)
 const viewMenuOpen = ref(false)
 
@@ -95,11 +96,10 @@ const map = useLeafletMap(container, activeCollection, {
   localContext,
   activePoolIds,
   viewMode,
+  isDark,
 })
 
-/** Latar terang perlu warna kontrol yang gelap, dan sebaliknya. */
-const isLightView = computed(() => viewMode.value === 'blueprint')
-const canvasColor = computed(() => mapTheme(viewMode.value).canvas)
+const canvasColor = computed(() => mapTheme(viewMode.value, isDark.value).canvas)
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && viewMenuOpen.value) {
@@ -165,10 +165,10 @@ defineExpose({
     >
       <div
         v-if="!map.ready.value"
-        class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-950/75 backdrop-blur-sm text-xs text-slate-300"
+        class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-50/80 dark:bg-slate-950/75 backdrop-blur-sm text-xs"
       >
-        <div class="h-6 w-6 rounded-full border-2 border-sky-500/20 border-t-sky-400 animate-spin" />
-        <p class="font-medium text-slate-200">Menyiapkan peta…</p>
+        <div class="h-6 w-6 rounded-full border-2 border-sky-500/20 border-t-sky-500 dark:border-t-sky-400 animate-spin" />
+        <p class="font-medium text-slate-600 dark:text-slate-200">Menyiapkan peta…</p>
       </div>
     </Transition>
 

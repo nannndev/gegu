@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import type { Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
+import { recordSession } from '~/utils/stats'
+import { saveDailyResult } from '~/utils/daily'
 
 export const TOTAL_ROUNDS = 10
 export const ROUND_SECONDS = 15
@@ -32,6 +34,12 @@ interface StartOptions {
   scope?: DatasetScope
   provinceName?: string
   cityName?: string
+  /** Kunci papan rekor; satu per cakupan soal. */
+  scopeKey?: string
+  /** Label cakupan siap-tampil, dipakai layar hasil & tombol bagikan. */
+  scopeLabel?: string
+  /** Kunci tanggal kalau sesi ini berasal dari tantangan harian. */
+  daily?: string
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -42,6 +50,9 @@ export const useGameStore = defineStore('game', () => {
   const regionFilter = ref('all')
   const timerEnabled = ref(false)
   const preferredRounds = ref(TOTAL_ROUNDS)
+  const scopeKey = ref('world')
+  const scopeLabel = ref('')
+  const dailyKey = ref('')
 
   const score = ref(0)
   const streak = ref(0)
@@ -132,21 +143,25 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function finishGame() {
+    // Sesi tanpa ronde selesai (mis. pool kosong) tidak dicatat — kalau ikut
+    // masuk, jumlah "total sesi" naik tanpa pemain pernah menjawab apa pun.
+    const alreadyFinished = phase.value === 'finished'
     phase.value = 'finished'
-    if (import.meta.client) {
-      try {
-        const prevBest = Number(localStorage.getItem('geoguess_best_score') || '0')
-        if (score.value > prevBest) {
-          localStorage.setItem('geoguess_best_score', String(score.value))
-        }
-        const prevStreak = Number(localStorage.getItem('geoguess_best_streak') || '0')
-        if (bestStreak.value > prevStreak) {
-          localStorage.setItem('geoguess_best_streak', String(bestStreak.value))
-        }
-        const prevGames = Number(localStorage.getItem('geoguess_games_played') || '0')
-        localStorage.setItem('geoguess_games_played', String(prevGames + 1))
-      }
-      catch {}
+    if (alreadyFinished || !history.value.length) return
+
+    recordSession({
+      scopeKey: scopeKey.value || datasetScope.value,
+      score: score.value,
+      bestStreak: bestStreak.value,
+      accuracy: accuracy.value,
+    })
+
+    if (dailyKey.value) {
+      saveDailyResult({
+        key: dailyKey.value,
+        score: score.value,
+        accuracy: accuracy.value,
+      })
     }
   }
 
@@ -159,6 +174,9 @@ export const useGameStore = defineStore('game', () => {
     regionFilter.value = options.regionFilter ?? 'all'
     timerEnabled.value = options.timerEnabled ?? false
     preferredRounds.value = options.roundsCount ?? TOTAL_ROUNDS
+    scopeKey.value = options.scopeKey ?? options.scope ?? 'world'
+    scopeLabel.value = options.scopeLabel ?? ''
+    dailyKey.value = options.daily ?? ''
     pool.value = options.pool
     totalRounds.value = Math.min(preferredRounds.value, options.pool.length)
     nextRound()
@@ -236,6 +254,9 @@ export const useGameStore = defineStore('game', () => {
     cityName,
     regionFilter,
     timerEnabled,
+    scopeKey,
+    scopeLabel,
+    dailyKey,
     score,
     streak,
     bestStreak,
@@ -255,6 +276,7 @@ export const useGameStore = defineStore('game', () => {
     accuracy,
     nextPoints,
     startGame,
+    finishGame,
     nextRound,
     submitAnswer,
     resetGame,

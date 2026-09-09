@@ -34,6 +34,8 @@ interface Options {
   activePoolIds?: Ref<Set<string> | null>
   /** Mode tampilan peta (vektor/relief/satelit/cetak biru). */
   viewMode?: Ref<MapViewMode>
+  /** Tema aplikasi; mode vektor punya padanan terang & gelap. */
+  isDark?: Ref<boolean>
 }
 
 export function useLeafletMap(
@@ -45,8 +47,9 @@ export function useLeafletMap(
   const interactive = ref(true)
   const scope = options.scope ?? ref('world')
   const viewMode = options.viewMode ?? ref<MapViewMode>('vector')
+  const isDark = options.isDark ?? ref(true)
   /** Tema aktif; semua style poligon dibaca dari sini. */
-  const theme = () => mapTheme(viewMode.value)
+  const theme = () => mapTheme(viewMode.value, isDark.value)
 
   let L: typeof import('leaflet') | null = null
   let map: LeafletMap | null = null
@@ -56,6 +59,8 @@ export function useLeafletMap(
   const layerById = new Map<string, Layer>()
   const itemById = new Map<string, RegionItem>()
   const marked = new Set<string>()
+  /** Jenis tanda per wilayah, supaya bisa digambar ulang setelah tema berganti. */
+  const markKindById = new Map<string, RegionMark>()
 
   function styleFor(layer: Layer, style: PathOptions) {
     ;(layer as unknown as { setStyle: (s: PathOptions) => void }).setStyle(style)
@@ -104,6 +109,7 @@ export function useLeafletMap(
       layerById.clear()
       itemById.clear()
       marked.clear()
+      markKindById.clear()
     }
 
     const t = theme()
@@ -231,6 +237,7 @@ export function useLeafletMap(
     const layer = layerById.get(id)
     if (!layer) return
     marked.add(id)
+    markKindById.set(id, kind)
     const item = itemById.get(id)
     const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
     styleFor(layer, { ...baseStyle, ...theme().mark[kind] })
@@ -239,6 +246,7 @@ export function useLeafletMap(
 
   function resetStyles() {
     marked.clear()
+    markKindById.clear()
     for (const [id, layer] of layerById.entries()) {
       const item = itemById.get(id)
       const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
@@ -355,10 +363,16 @@ export function useLeafletMap(
     }
   })
 
-  // Ganti view mode hanya menukar ubin & warna — kamera dibiarkan di tempatnya
-  // supaya pemain tidak kehilangan posisi di tengah ronde.
-  watch(viewMode, () => {
-    if (ready.value) setupLayers()
+  // Ganti view mode atau tema hanya menukar ubin & warna — kamera dibiarkan di
+  // tempatnya supaya pemain tidak kehilangan posisi di tengah ronde.
+  watch([viewMode, isDark], () => {
+    if (!ready.value) return
+    // `setupLayers` mengosongkan `marked`, jadi jenis tandanya disalin dulu —
+    // tanpa ini wilayah yang sudah dijawab kehilangan warna hijau/merahnya
+    // begitu pemain mengganti tema di tengah ronde.
+    const previous = [...markKindById.entries()]
+    setupLayers()
+    for (const [id, kind] of previous) mark(id, kind)
   })
 
   onMounted(() => {
@@ -381,6 +395,7 @@ export function useLeafletMap(
     layerById.clear()
     itemById.clear()
     marked.clear()
+    markKindById.clear()
     ready.value = false
   })
 

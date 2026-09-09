@@ -3,6 +3,9 @@ import type { PathOptions } from 'leaflet'
 /** Mode tampilan peta yang bisa dipilih pemain. */
 export type MapViewMode = 'vector' | 'terrain' | 'satellite' | 'blueprint'
 
+/** Termasuk varian internal yang dipilih otomatis mengikuti tema aplikasi. */
+export type MapThemeKey = MapViewMode | 'vector-light'
+
 export interface TileConfig {
   url: string
   attribution: string
@@ -48,7 +51,7 @@ const MARK_ON_TILES: MapTheme['mark'] = {
   target: { fillColor: '#0284c7', fillOpacity: 0.55, color: '#e0f2fe', weight: 3.5 },
 }
 
-const THEMES: Record<MapViewMode, MapTheme> = {
+const THEMES: Record<MapThemeKey, MapTheme> = {
   /** Default: vektor gelap modern bernuansa midnight slate & electric sky — paling kontras & cool. */
   vector: {
     canvas: '#080b11',
@@ -62,6 +65,29 @@ const THEMES: Record<MapViewMode, MapTheme> = {
     contextLocal: { fillColor: '#080b11', fillOpacity: 0.8, color: '#1e293b', weight: 0.75 },
     hover: { fillColor: '#0369a1', fillOpacity: 0.95, color: '#38bdf8', weight: 2.5 },
     mark: MARK_VIVID,
+  },
+
+  /**
+   * Padanan terang dari mode vektor. Tidak bisa dipilih pemain — dipakai
+   * otomatis saat tema aplikasi terang, karena poligon `#0f172a` di atas
+   * kanvas putih membuat peta terlihat seperti gambar rusak.
+   */
+  'vector-light': {
+    canvas: '#eef2f7',
+    tiles: null,
+    flagWorld: true,
+    context: { fillColor: '#dde4ed', fillOpacity: 1, color: '#c2ccd9', weight: 0.75 },
+    contextLand: { fillColor: '#e6ecf3', fillOpacity: 1, color: '#a9b6c6', weight: 0.9 },
+    baseWorld: { fillColor: '#ffffff', fillOpacity: 1, color: '#b6c2d1', weight: 0.85 },
+    baseId: { fillColor: '#f8fbff', fillOpacity: 1, color: '#0284c7', weight: 1.2 },
+    activeLocal: { fillColor: '#e0f2fe', fillOpacity: 1, color: '#0284c7', weight: 2 },
+    contextLocal: { fillColor: '#e2e8f0', fillOpacity: 0.95, color: '#c2ccd9', weight: 0.75 },
+    hover: { fillColor: '#7dd3fc', fillOpacity: 0.9, color: '#0369a1', weight: 2.5 },
+    mark: {
+      correct: { fillColor: '#059669', fillOpacity: 0.95, color: '#065f46', weight: 3 },
+      wrong: { fillColor: '#e11d48', fillOpacity: 0.95, color: '#9f1239', weight: 3 },
+      target: { fillColor: '#0284c7', fillOpacity: 0.95, color: '#075985', weight: 3 },
+    },
   },
 
   /** Relief teduh: bentuk daratan terlihat, isian poligon ditipiskan. */
@@ -123,14 +149,21 @@ const THEMES: Record<MapViewMode, MapTheme> = {
 }
 
 export const MAP_VIEW_MODES: { id: MapViewMode, label: string, icon: string, hint: string }[] = [
-  { id: 'vector', label: 'Vektor', icon: '◈', hint: 'Gelap & kontras tinggi' },
+  { id: 'vector', label: 'Vektor', icon: '◈', hint: 'Ikut tema, kontras tinggi' },
   { id: 'terrain', label: 'Relief', icon: '⛰', hint: 'Bentuk permukaan terlihat' },
   { id: 'satellite', label: 'Satelit', icon: '🛰', hint: 'Citra asli dari udara' },
   { id: 'blueprint', label: 'Cetak Biru', icon: '⬡', hint: 'Latar terang, garis tegas' },
 ]
 
-export function mapTheme(mode: MapViewMode): MapTheme {
-  return THEMES[mode] ?? THEMES.vector
+/**
+ * Tema poligon untuk satu mode tampilan.
+ *
+ * `isDark` hanya berpengaruh di mode vektor: mode relief & satelit punya ubin
+ * fotonya sendiri (selalu gelap), dan cetak biru memang sengaja selalu terang.
+ */
+export function mapTheme(mode: MapThemeKey, isDark = true): MapTheme {
+  if (mode === 'vector' && !isDark) return THEMES['vector-light']!
+  return THEMES[mode] ?? THEMES.vector!
 }
 
 const STORAGE_KEY = 'geoguess_map_view'
