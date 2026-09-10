@@ -1,3 +1,4 @@
+import type { MessageKey } from '~/i18n/id'
 import type { PathOptions } from 'leaflet'
 
 /** Mode tampilan peta yang bisa dipilih pemain. */
@@ -148,11 +149,20 @@ const THEMES: Record<MapThemeKey, MapTheme> = {
   },
 }
 
-export const MAP_VIEW_MODES: { id: MapViewMode, label: string, icon: string, hint: string }[] = [
-  { id: 'vector', label: 'Vektor', icon: '◈', hint: 'Ikut tema, kontras tinggi' },
-  { id: 'terrain', label: 'Relief', icon: '⛰', hint: 'Bentuk permukaan terlihat' },
-  { id: 'satellite', label: 'Satelit', icon: '🛰', hint: 'Citra asli dari udara' },
-  { id: 'blueprint', label: 'Cetak Biru', icon: '⬡', hint: 'Latar terang, garis tegas' },
+/**
+ * Mode tampilan peta. Nama & keterangannya disimpan sebagai kunci kamus,
+ * bukan teks jadinya, supaya menu ini ikut bahasa aktif.
+ */
+export const MAP_VIEW_MODES: {
+  id: MapViewMode
+  icon: string
+  labelKey: MessageKey
+  hintKey: MessageKey
+}[] = [
+  { id: 'vector', icon: '◈', labelKey: 'map.view.vector', hintKey: 'map.view.vectorHint' },
+  { id: 'terrain', icon: '⛰', labelKey: 'map.view.terrain', hintKey: 'map.view.terrainHint' },
+  { id: 'satellite', icon: '🛰', labelKey: 'map.view.satellite', hintKey: 'map.view.satelliteHint' },
+  { id: 'blueprint', icon: '⬡', labelKey: 'map.view.blueprint', hintKey: 'map.view.blueprintHint' },
 ]
 
 /**

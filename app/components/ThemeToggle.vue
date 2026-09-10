@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { MessageKey } from '~/i18n/id'
 import type { ThemePreference } from '~/composables/useTheme'
 
 /**
@@ -8,11 +9,12 @@ import type { ThemePreference } from '~/composables/useTheme'
  */
 const { preference, setTheme } = useTheme()
 const { playClick } = useAudio()
+const { t } = useI18n()
 
-const OPTIONS: { value: ThemePreference, label: string, title: string }[] = [
-  { value: 'light', label: 'Terang', title: 'Selalu mode terang' },
-  { value: 'system', label: 'Sistem', title: 'Ikuti setelan perangkat' },
-  { value: 'dark', label: 'Gelap', title: 'Selalu mode gelap' },
+const OPTIONS: { value: ThemePreference, labelKey: MessageKey, titleKey: MessageKey }[] = [
+  { value: 'light', labelKey: 'common.theme.light', titleKey: 'common.theme.lightTitle' },
+  { value: 'system', labelKey: 'common.theme.system', titleKey: 'common.theme.systemTitle' },
+  { value: 'dark', labelKey: 'common.theme.dark', titleKey: 'common.theme.darkTitle' },
 ]
 
 function choose(value: ThemePreference) {
@@ -23,14 +25,14 @@ function choose(value: ThemePreference) {
 </script>
 
 <template>
-  <div class="seg-track w-auto gap-0.5 p-0.5" role="radiogroup" aria-label="Tema tampilan">
+  <div class="seg-track w-auto gap-0.5 p-0.5" role="radiogroup" :aria-label="t('common.theme.label')">
     <button
       v-for="o in OPTIONS"
       :key="o.value"
       type="button"
       role="radio"
       :aria-checked="preference === o.value"
-      :title="o.title"
+      :title="t(o.titleKey)"
       class="seg-item focusable !flex-none justify-center px-2 py-1"
       :class="preference === o.value
         ? '!bg-white dark:!bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
@@ -51,7 +53,7 @@ function choose(value: ThemePreference) {
       <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>
-      <span class="sr-only sm:not-sr-only">{{ o.label }}</span>
+      <span class="sr-only sm:not-sr-only">{{ t(o.labelKey) }}</span>
     </button>
   </div>
 </template>

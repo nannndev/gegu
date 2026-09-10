@@ -20,6 +20,8 @@ const emit = defineEmits<{
   select: [cityId: string]
 }>()
 
+const { t } = useI18n()
+
 const open = ref(false)
 const query = ref('')
 const activeIndex = ref(0)
@@ -39,7 +41,7 @@ function shortName(city: string) {
 }
 
 function kind(city: string) {
-  return /^Kota/.test(city) ? 'Kota' : 'Kab.'
+  return /^Kota/.test(city) ? t('city.kindCity') : t('city.kindRegency')
 }
 
 /**
@@ -181,14 +183,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
     >
       <span class="min-w-0 flex-1">
         <span class="block truncate text-xs font-bold text-slate-900 dark:text-slate-100">
-          {{ selected ? shortName(selected.city) : 'Pilih kabupaten / kota…' }}
+          {{ selected ? shortName(selected.city) : t('city.placeholder') }}
         </span>
         <span v-if="selected" class="block truncate text-[11px] text-slate-500 dark:text-slate-400">
-          {{ kind(selected.city) }} · {{ selected.province }} · <strong class="font-semibold text-sky-600 dark:text-sky-400">{{ selected.count }} kecamatan</strong>
+          {{ kind(selected.city) }} · {{ selected.province }} · <strong class="font-semibold text-sky-600 dark:text-sky-400">{{ t('city.kecamatanCount', { n: selected.count }) }}</strong>
         </span>
       </span>
       <div class="flex items-center gap-1 text-slate-400 dark:text-slate-500">
-        <span v-if="!selected" class="text-[11px]">Cari…</span>
+        <span v-if="!selected" class="text-[11px]">{{ t('city.searchHint') }}</span>
         <svg
           xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform"
           :class="open ? 'rotate-180 text-sky-500' : ''" viewBox="0 0 20 20" fill="currentColor"
@@ -215,8 +217,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
               ref="inputEl"
               v-model="query"
               type="text"
-              placeholder="Ketik nama kota, kabupaten, atau provinsi…"
-              aria-label="Cari kabupaten atau kota"
+              :placeholder="t('city.searchPlaceholder')"
+              :aria-label="t('city.searchAria')"
               class="focusable w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950 py-2 pl-8 pr-3 text-xs text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 focus:border-sky-500 dark:focus:border-sky-400"
               @keydown="onKeydown"
             >
@@ -226,17 +228,17 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
           </div>
           <p class="mt-1.5 px-0.5 text-[10px] text-slate-500 dark:text-slate-400">
             <template v-if="query">
-              {{ results.length }} hasil ditemukan · {{ totalKecamatan }} kecamatan
+              {{ t('city.resultsFound', { n: results.length, total: totalKecamatan }) }}
             </template>
             <template v-else>
-              {{ province }} · {{ results.length }} kab/kota · ketik untuk cari se-Indonesia
+              {{ t('city.provinceSummary', { province, n: results.length }) }}
             </template>
           </p>
         </div>
 
         <div ref="listEl" role="listbox" class="overflow-y-auto overscroll-contain py-1" :style="{ maxHeight: `${menuMaxHeight}px` }">
           <p v-if="!results.length" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-            Tidak ada yang cocok dengan “{{ query }}”.
+            {{ t('city.noMatch', { query }) }}
           </p>
 
           <template v-for="group in grouped" :key="group.province">
@@ -261,7 +263,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick)
               <span class="w-8 shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500">{{ kind(c.city) }}</span>
               <span class="min-w-0 flex-1 truncate text-xs">{{ shortName(c.city) }}</span>
               <span class="shrink-0 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                {{ c.count }} kec.
+                {{ t('city.kecamatanShort', { n: c.count }) }}
               </span>
               <span v-if="c.id === selectedId" class="shrink-0 text-xs font-bold text-sky-500" aria-hidden="true">✓</span>
             </button>

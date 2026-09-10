@@ -1,3 +1,4 @@
+import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { DatasetScope, GameMode, RegionItem, RegionLevel } from '~/types/game'
 
 export type PrimaryScope = 'world' | 'indonesia'
@@ -33,6 +34,8 @@ const STORAGE_KEY = 'geoguess_setup_v1'
 export function useGameSetup() {
   const geo = useGeoData()
   const { playClick } = useAudio()
+  const { t } = useI18n()
+  const { formatScope, unitFor } = useScopeLabel()
 
   const primaryScope = useState<PrimaryScope>('setup-primary', () => 'indonesia')
   const indonesiaLevel = useState<IndonesiaLevel>('setup-id-level', () => 'kecamatan')
@@ -86,17 +89,13 @@ export function useGameSetup() {
 
   const roundOptions = computed(() => {
     const total = poolSize.value
-    if (total <= 5) return [{ label: `Semua (${total})`, value: total }]
-    if (total <= 10) {
-      return [
-        { label: '5', value: 5 },
-        { label: `Semua (${total})`, value: total },
-      ]
-    }
+    const all = { label: t('setup.session.roundsAll', { n: total }), value: total }
+    if (total <= 5) return [all]
+    if (total <= 10) return [{ label: '5', value: 5 }, all]
     return [
       { label: '5', value: 5 },
       { label: '10', value: 10 },
-      { label: total <= 20 ? `Semua (${total})` : '20', value: Math.min(20, total) },
+      total <= 20 ? all : { label: '20', value: 20 },
     ]
   })
 
@@ -110,37 +109,35 @@ export function useGameSetup() {
     return `id-kecamatan:${geo.activeKecamatanCity.value?.id ?? ''}`
   })
 
-  const unitLabel = computed(() => {
-    const s = activeScope.value
-    if (s === 'world') return 'negara'
-    if (s === 'id-provinces') return 'provinsi'
-    if (s === 'id-kabupaten') return 'kab/kota'
-    if (s === 'id-mixed') return 'wilayah'
-    return 'kecamatan'
+  const unitLabel = computed(() => unitFor(activeScope.value))
+
+  /**
+   * Penyusun label cakupan, masih bebas bahasa. Ini yang diteruskan ke store
+   * saat sesi dimulai — kalau yang disimpan teks jadinya, mengganti bahasa di
+   * tengah sesi menyisakan label bahasa lama di layar hasil.
+   */
+  const scopeParts = computed<ScopeParts>(() => {
+    const mixedParts = (['province', 'kabupaten', 'kecamatan'] as const)
+      .filter(key => mixedLevels.value[key])
+
+    return {
+      scope: activeScope.value,
+      regionFilter: regionFilter.value,
+      provinceName: selectedProvince.value,
+      cityName: geo.activeKecamatanCity.value?.city ?? '',
+      mixedParts: [...mixedParts],
+    }
   })
 
-  const scopeLabel = computed(() => {
-    const s = activeScope.value
-    if (s === 'world') return regionFilter.value === 'all' ? 'Seluruh Dunia' : regionFilter.value
-    if (s === 'id-provinces') {
-      return regionFilter.value === 'all' ? 'Indonesia · 38 Provinsi' : `Indonesia · ${regionFilter.value}`
-    }
-    if (s === 'id-kabupaten') return `${selectedProvince.value} · Kab/Kota`
-    if (s === 'id-mixed') {
-      const parts: string[] = []
-      if (mixedLevels.value.province) parts.push('Provinsi')
-      if (mixedLevels.value.kabupaten) parts.push('Kab/Kota')
-      if (mixedLevels.value.kecamatan) parts.push('Kecamatan')
-      return `Campuran · ${parts.join(' + ')}`
-    }
-    return `${cityShortName.value || 'Kota'} · Kecamatan`
-  })
+  const scopeLabel = computed(() => formatScope(scopeParts.value))
 
   const cityShortName = computed(() =>
     (geo.activeKecamatanCity.value?.city ?? '').replace(/^(Kota|Kabupaten)( Administrasi)? /, ''),
   )
 
-  const modeLabel = computed(() => (selectedMode.value === 'A' ? 'Klik Petanya' : 'Pilih Nama'))
+  const modeLabel = computed(() =>
+    selectedMode.value === 'A' ? t('setup.mode.a.title') : t('setup.mode.b.title'),
+  )
 
   /** Setel ulang filter & ronde setelah cakupan berganti. */
   async function syncScope() {
@@ -310,6 +307,7 @@ export function useGameSetup() {
     effectiveRounds,
     roundOptions,
     scopeKey,
+    scopeParts,
     scopeLabel,
     unitLabel,
     modeLabel,

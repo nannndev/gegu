@@ -18,6 +18,9 @@ const {
 } = useGeoData()
 const { mode: viewMode, setMode, modes } = useMapViewMode()
 const { isDark } = useTheme()
+const { t } = useI18n()
+
+const activeView = computed(() => modes.find(m => m.id === viewMode.value))
 const container = ref<HTMLElement | null>(null)
 const viewMenuOpen = ref(false)
 
@@ -168,7 +171,7 @@ defineExpose({
         class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-50/80 dark:bg-slate-950/75 backdrop-blur-sm text-xs"
       >
         <div class="h-6 w-6 rounded-full border-2 border-sky-500/20 border-t-sky-500 dark:border-t-sky-400 animate-spin" />
-        <p class="font-medium text-slate-600 dark:text-slate-200">Menyiapkan peta…</p>
+        <p class="font-medium text-slate-600 dark:text-slate-200">{{ t('map.loading') }}</p>
       </div>
     </Transition>
 
@@ -176,13 +179,13 @@ defineExpose({
     <div v-if="map.ready.value" class="absolute bottom-24 left-4 z-[1150] sm:bottom-20">
       <button
         type="button"
-        aria-label="Mode tampilan peta"
+        :aria-label="t('map.viewLabel')"
         :aria-expanded="viewMenuOpen"
         class="focusable flex items-center gap-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 shadow-md backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800"
         @click="viewMenuOpen = !viewMenuOpen"
       >
-        <span aria-hidden="true">{{ modes.find(m => m.id === viewMode)?.icon }}</span>
-        <span>{{ modes.find(m => m.id === viewMode)?.label }}</span>
+        <span aria-hidden="true">{{ activeView?.icon }}</span>
+        <span>{{ activeView ? t(activeView.labelKey) : '' }}</span>
         <svg
           xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-slate-400 transition-transform"
           :class="viewMenuOpen ? '' : 'rotate-180'"
@@ -217,8 +220,8 @@ defineExpose({
           >
             <span class="mt-px text-sm" aria-hidden="true">{{ m.icon }}</span>
             <span class="min-w-0 flex-1">
-              <span class="block text-[11px] font-semibold">{{ m.label }}</span>
-              <span class="block text-[10px] text-slate-400 dark:text-slate-500">{{ m.hint }}</span>
+              <span class="block text-[11px] font-semibold">{{ t(m.labelKey) }}</span>
+              <span class="block text-[10px] text-slate-400 dark:text-slate-500">{{ t(m.hintKey) }}</span>
             </span>
             <span
               v-if="m.id === viewMode"
@@ -237,8 +240,8 @@ defineExpose({
     >
       <button
         type="button"
-        title="Zoom In"
-        aria-label="Zoom In"
+        :title="t('map.zoomIn')"
+        :aria-label="t('map.zoomIn')"
         class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="zoomIn"
       >
@@ -252,8 +255,8 @@ defineExpose({
 
       <button
         type="button"
-        title="Zoom Out"
-        aria-label="Zoom Out"
+        :title="t('map.zoomOut')"
+        :aria-label="t('map.zoomOut')"
         class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="zoomOut"
       >
@@ -266,8 +269,8 @@ defineExpose({
 
       <button
         type="button"
-        title="Reset Camera"
-        aria-label="Reset Camera"
+        :title="t('map.resetCamera')"
+        :aria-label="t('map.resetCamera')"
         class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95"
         @click="resetView"
       >

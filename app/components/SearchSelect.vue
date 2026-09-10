@@ -32,11 +32,18 @@ const props = withDefaults(defineProps<{
 }>(), {
   accent: 'brass',
   searchThreshold: 8,
-  placeholder: 'Pilih…',
-  searchPlaceholder: 'Cari…',
+  placeholder: '',
+  searchPlaceholder: '',
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
+
+const { t } = useI18n()
+
+// Teks bawaan diambil dari kamus, bukan dari nilai default prop: default prop
+// dievaluasi sekali, jadi teksnya tidak ikut berubah saat bahasa diganti.
+const placeholderText = computed(() => props.placeholder || t('common.select'))
+const searchPlaceholderText = computed(() => props.searchPlaceholder || t('common.search'))
 
 const open = ref(false)
 const query = ref('')
@@ -200,7 +207,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
     >
       <span class="min-w-0 flex-1">
         <span class="block truncate text-xs font-bold" :class="accent.label">
-          {{ selected?.label ?? placeholder }}
+          {{ selected?.label ?? placeholderText }}
         </span>
         <span v-if="selected?.hint" class="block truncate text-[10px] text-slate-500 dark:text-slate-400">
           {{ selected.hint }}
@@ -232,8 +239,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
               ref="inputEl"
               v-model="query"
               type="text"
-              :placeholder="searchPlaceholder"
-              :aria-label="searchPlaceholder"
+              :placeholder="searchPlaceholderText"
+              :aria-label="searchPlaceholderText"
               class="focusable w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 focus:border-sky-500 dark:focus:border-sky-400"
               @keydown="onKeydown"
             >
@@ -245,7 +252,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentPointe
 
         <div ref="listEl" role="listbox" class="overflow-y-auto overscroll-contain py-1" :style="{ maxHeight: `${menuMaxHeight}px` }">
           <p v-if="!results.length" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-            Tidak ada yang cocok.
+            {{ t('common.noMatch') }}
           </p>
 
           <template v-for="(g, gi) in grouped" :key="g.group ?? `g${gi}`">

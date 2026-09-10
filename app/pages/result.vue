@@ -3,10 +3,21 @@ import { isoToFlag, getPerformanceRank } from '~/utils/geo'
 
 const game = useGameStore()
 const { playFanfare, playClick } = useAudio()
+const { t } = useI18n()
+const { formatScope } = useScopeLabel()
 
 if (!game.history.length) await navigateTo('/')
 
-const rank = computed(() => getPerformanceRank(game.accuracy, game.score))
+/** Peringkat + teksnya; dirakit saat render supaya ikut bahasa aktif. */
+const rank = computed(() => {
+  const r = getPerformanceRank(game.accuracy, game.score)
+  return {
+    ...r,
+    title: t(`rank.${r.tier}.title`),
+    badge: t(`rank.${r.tier}.badge`),
+    desc: t(`rank.${r.tier}.desc`),
+  }
+})
 const copiedToast = ref(false)
 
 // Animate the final score counting up from 0 (skipped for reduced motion).
@@ -57,7 +68,7 @@ function playAgain() {
     provinceName: game.provinceName,
     cityName: game.cityName,
     scopeKey: game.scopeKey,
-    scopeLabel: game.scopeLabel,
+    scopeParts: game.scopeParts ?? undefined,
     // Ulangan tidak dihitung sebagai tantangan harian lagi — hasil harian
     // hanya boleh dicatat sekali per hari.
   })
@@ -70,13 +81,27 @@ function toHome() {
   navigateTo('/')
 }
 
-/** Label cakupan; dipakai di header dan teks yang disalin. */
-const scopeLabel = computed(() => {
-  if (game.scopeLabel) return game.scopeLabel
-  if (game.datasetScope === 'id-kecamatan') return `${game.cityName || 'Kota'} · Kecamatan`
-  if (game.datasetScope === 'id-kabupaten') return `${game.provinceName || 'Provinsi'} · Kab/Kota`
-  if (game.datasetScope === 'id-provinces') return 'Indonesia · 38 Provinsi'
-  return game.regionFilter === 'all' ? 'Seluruh Dunia' : game.regionFilter
+/**
+ * Label cakupan; dipakai di header dan teks yang disalin. Dirakit dari
+ * penyusunnya, bukan dibaca sebagai teks jadi, jadi mengganti bahasa di
+ * layar ini langsung ikut berubah.
+ */
+const scopeLabel = computed(() =>
+  formatScope(game.scopeParts ?? {
+    scope: game.datasetScope,
+    regionFilter: game.regionFilter,
+    provinceName: game.provinceName,
+    cityName: game.cityName,
+  }),
+)
+
+/** Judul kolom tabel: satuan wilayah yang ditebak di sesi ini. */
+const columnHeader = computed(() => {
+  if (game.datasetScope === 'id-kecamatan') return t('scope.kecamatan')
+  if (game.datasetScope === 'id-kabupaten') return t('setup.level.kabupaten')
+  if (game.datasetScope === 'id-provinces') return t('scope.provinces')
+  if (game.datasetScope === 'id-mixed') return t('unit.region')
+  return t('unit.country')
 })
 
 /**
@@ -89,14 +114,20 @@ const resultSquares = computed(() =>
 
 async function shareResults() {
   playClick()
-  const modeName = game.mode === 'A' ? 'Klik peta' : 'Pilih nama'
+  const modeName = game.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short')
   const lines = [
-    game.dailyKey ? `GeoGuesser · Tantangan ${game.dailyKey}` : 'Hasil main GeoGuesser',
+    game.dailyKey
+      ? t('result.share.daily', { key: game.dailyKey })
+      : t('result.share.title'),
     rank.value.title,
     resultSquares.value,
-    `Skor: ${game.score} poin · Akurasi ${game.accuracy}%`,
-    `Benar: ${game.correctCount}/${game.history.length} · Streak ${game.bestStreak}`,
-    `Mode: ${modeName} (${scopeLabel.value})`,
+    t('result.share.score', { score: game.score, accuracy: game.accuracy }),
+    t('result.share.correct', {
+      correct: game.correctCount,
+      total: game.history.length,
+      streak: game.bestStreak,
+    }),
+    t('result.share.mode', { mode: modeName, scope: scopeLabel.value }),
   ]
   const text = lines.filter(Boolean).join('\n')
 
@@ -119,6 +150,16 @@ async function shareResults() {
     <div class="pointer-events-none fixed inset-0 bg-ambient-glow" />
 
     <div class="relative z-10 mx-auto w-full max-w-3xl space-y-5">
+      <!--
+        Pengalih bahasa & tema ikut hadir di sini: layar ini bisa jadi tempat
+        pertama pemain berhenti lama (skor dibaca, disalin, dibagikan), dan
+        tanpa kontrol ini satu-satunya jalan ganti bahasa adalah balik ke menu.
+      -->
+      <div class="flex items-center justify-end gap-2">
+        <LanguageToggle />
+        <ThemeToggle />
+      </div>
+
       <!-- Session Header Card — cool elegant summary -->
       <div class="step-card p-6 sm:p-8 shadow-xl">
         <div class="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -131,10 +172,10 @@ async function shareResults() {
                 v-if="game.dailyKey"
                 class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400"
               >
-                🎯 Harian {{ game.dailyKey }}
+                🎯 {{ t('daily.badge', { key: game.dailyKey }) }}
               </span>
               <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                {{ game.mode === 'A' ? 'Klik peta' : 'Pilih nama' }} · {{ scopeLabel }}
+                {{ game.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short') }} · {{ scopeLabel }}
               </span>
             </div>
 
@@ -147,7 +188,7 @@ async function shareResults() {
           </div>
 
           <div class="shrink-0 border-t border-slate-200 dark:border-slate-800 pt-3 text-left sm:border-t-0 sm:pt-0 sm:text-right">
-            <span class="block font-mono text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Skor akhir</span>
+            <span class="block font-mono text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ t('result.finalScore') }}</span>
             <span class="font-display text-5xl font-black text-slate-900 dark:text-white sm:text-6xl" aria-live="polite">
               {{ displayedScore }}
             </span>
@@ -155,7 +196,7 @@ async function shareResults() {
         </div>
 
         <!-- Ringkasan per ronde sebagai deret kotak -->
-        <div class="flex flex-wrap gap-1 pt-6" role="img" :aria-label="`${game.correctCount} benar dari ${game.history.length} ronde`">
+        <div class="flex flex-wrap gap-1 pt-6" role="img" :aria-label="t('result.squares', { correct: game.correctCount, total: game.history.length })">
           <span
             v-for="row in game.history"
             :key="row.round"
@@ -167,21 +208,21 @@ async function shareResults() {
         <!-- Metrics Grid -->
         <div class="grid grid-cols-3 gap-3 pt-5">
           <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/40 p-3.5 text-center">
-            <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Akurasi</span>
+            <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ t('result.accuracy') }}</span>
             <span class="mt-1 block font-mono text-2xl font-black text-slate-900 dark:text-white">
               {{ game.accuracy }}%
             </span>
           </div>
 
           <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-center">
-            <span class="block text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Benar</span>
+            <span class="block text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">{{ t('result.correct') }}</span>
             <span class="mt-1 block font-mono text-2xl font-black text-emerald-700 dark:text-emerald-400">
               {{ game.correctCount }}<span class="text-emerald-700/60 dark:text-emerald-400/60 text-sm font-normal">/{{ game.history.length }}</span>
             </span>
           </div>
 
           <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-center">
-            <span class="block text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Streak puncak</span>
+            <span class="block text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">{{ t('result.bestStreak') }}</span>
             <span class="mt-1 block font-mono text-2xl font-black text-amber-700 dark:text-amber-400">
               {{ game.bestStreak }} 🔥
             </span>
@@ -193,9 +234,9 @@ async function shareResults() {
       <div class="raycast-card overflow-hidden rounded-2xl shadow-xl">
         <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3.5">
           <h2 class="font-mono text-xs font-bold uppercase tracking-[0.16em] text-slate-900 dark:text-slate-200">
-            Catatan ronde
+            {{ t('result.tableTitle') }}
           </h2>
-          <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ game.history.length }} ronde</span>
+          <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ t('common.rounds', { n: game.history.length }) }}</span>
         </div>
 
         <div class="max-h-64 overflow-y-auto">
@@ -203,9 +244,9 @@ async function shareResults() {
             <thead class="sticky top-0 border-b border-slate-200 dark:border-slate-800 bg-slate-100/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 backdrop-blur">
               <tr>
                 <th class="w-12 px-4 py-2.5 font-semibold">#</th>
-                <th class="px-4 py-2.5 font-semibold">{{ game.datasetScope === 'id-kecamatan' ? 'Kecamatan' : game.datasetScope === 'id-kabupaten' ? 'Kab / Kota' : game.datasetScope === 'id-provinces' ? 'Provinsi' : 'Negara' }}</th>
-                <th class="px-4 py-2.5 font-semibold">Hasil</th>
-                <th class="px-4 py-2.5 text-right font-semibold">Poin</th>
+                <th class="px-4 py-2.5 font-semibold">{{ columnHeader }}</th>
+                <th class="px-4 py-2.5 font-semibold">{{ t('result.table.result') }}</th>
+                <th class="px-4 py-2.5 text-right font-semibold">{{ t('result.table.points') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200/60 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
@@ -221,7 +262,7 @@ async function shareResults() {
                   <span class="mr-1.5">{{ game.datasetScope === 'world' ? (isoToFlag(row.targetIso) || '🌐') : '🇮🇩' }}</span>
                   <span>{{ row.targetName }}</span>
                   <span v-if="!row.correct && row.answerName" class="ml-1.5 text-[11px] font-normal text-rose-600 dark:text-rose-400">
-                    (pilih {{ row.answerName }})
+                    {{ t('result.table.picked', { name: row.answerName }) }}
                   </span>
                 </td>
                 <td class="px-4 py-2.5">
@@ -229,13 +270,13 @@ async function shareResults() {
                     v-if="row.correct"
                     class="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400"
                   >
-                    ✓ Benar
+                    ✓ {{ t('common.correct') }}
                   </span>
                   <span
                     v-else
                     class="inline-flex items-center rounded border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400"
                   >
-                    ✗ Meleset
+                    ✗ {{ t('common.wrong') }}
                   </span>
                 </td>
                 <td class="px-4 py-2.5 text-right font-mono font-bold" :class="row.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'">
@@ -254,7 +295,7 @@ async function shareResults() {
           class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-600/25 transition active:scale-95 sm:flex-1"
           @click="playAgain"
         >
-          Main Lagi
+          {{ t('result.playAgain') }}
         </button>
 
         <button
@@ -262,7 +303,7 @@ async function shareResults() {
           class="inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 sm:w-auto"
           @click="shareResults"
         >
-          {{ copiedToast ? '✓ Berhasil Disalin' : 'Salin Skor' }}
+          {{ copiedToast ? t('result.copied') : t('result.copy') }}
         </button>
 
         <button
@@ -270,7 +311,7 @@ async function shareResults() {
           class="inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 transition hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95 sm:w-auto"
           @click="toHome"
         >
-          Kembali ke Menu
+          {{ t('result.home') }}
         </button>
       </div>
     </div>

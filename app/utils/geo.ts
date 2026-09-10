@@ -34,43 +34,29 @@ export function getRegionColor(region: string): { bg: string; text: string; bord
   }
 }
 
+/** Tingkatan performa; teksnya diambil dari kamus bahasa saat render. */
+export type PerformanceTier = 'master' | 'expert' | 'explorer' | 'cadet'
+
 /**
- * Evaluates game performance and assigns a cartographic tier in Indonesian,
- * matching the game's UI language.
+ * Evaluates game performance and assigns a cartographic tier.
+ *
+ * Returns a tier id plus its icon — never the copy itself, so the result
+ * screen can render it in whichever language the player picked, even if they
+ * switch after the session ends.
  */
-export function getPerformanceRank(accuracy: number, score: number) {
+export function getPerformanceRank(accuracy: number, score: number): {
+  tier: PerformanceTier
+  icon: string
+  textColor: string
+} {
   if (accuracy >= 90 && score >= 120) {
-    return {
-      title: 'Kartografer Agung',
-      badge: 'Tier 1 · Master',
-      desc: 'Presisi geografis luar biasa — kamu hafal peta sampai ke detail kecil.',
-      icon: '🏆',
-      textColor: 'text-zinc-100',
-    }
+    return { tier: 'master', icon: '🏆', textColor: 'text-zinc-100' }
   }
   if (accuracy >= 75) {
-    return {
-      title: 'Navigator Global',
-      badge: 'Tier 2 · Expert',
-      desc: 'Orientasi spasial yang kuat lintas benua dan wilayah.',
-      icon: '🌍',
-      textColor: 'text-zinc-100',
-    }
+    return { tier: 'expert', icon: '🌍', textColor: 'text-zinc-100' }
   }
   if (accuracy >= 50) {
-    return {
-      title: 'Penjelajah Dunia',
-      badge: 'Tier 3 · Explorer',
-      desc: 'Pemahaman peta yang solid, tinggal diasah biar makin tajam.',
-      icon: '🧭',
-      textColor: 'text-zinc-200',
-    }
+    return { tier: 'explorer', icon: '🧭', textColor: 'text-zinc-200' }
   }
-  return {
-    title: 'Kadet Penjelajah',
-    badge: 'Tier 4 · Kadet',
-    desc: 'Terus latihan, batas wilayah dunia makin hafal tiap main.',
-    icon: '🗺️',
-    textColor: 'text-zinc-300',
-  }
+  return { tier: 'cadet', icon: '🗺️', textColor: 'text-zinc-300' }
 }

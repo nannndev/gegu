@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 import { recordSession } from '~/utils/stats'
 import { saveDailyResult } from '~/utils/daily'
@@ -36,8 +37,11 @@ interface StartOptions {
   cityName?: string
   /** Kunci papan rekor; satu per cakupan soal. */
   scopeKey?: string
-  /** Label cakupan siap-tampil, dipakai layar hasil & tombol bagikan. */
-  scopeLabel?: string
+  /**
+   * Penyusun label cakupan, bukan teks jadinya: layar hasil merakit sendiri
+   * labelnya, jadi pengalih bahasa tetap benar di tengah sesi.
+   */
+  scopeParts?: ScopeParts
   /** Kunci tanggal kalau sesi ini berasal dari tantangan harian. */
   daily?: string
 }
@@ -51,7 +55,7 @@ export const useGameStore = defineStore('game', () => {
   const timerEnabled = ref(false)
   const preferredRounds = ref(TOTAL_ROUNDS)
   const scopeKey = ref('world')
-  const scopeLabel = ref('')
+  const scopeParts = ref<ScopeParts | null>(null)
   const dailyKey = ref('')
 
   const score = ref(0)
@@ -175,7 +179,7 @@ export const useGameStore = defineStore('game', () => {
     timerEnabled.value = options.timerEnabled ?? false
     preferredRounds.value = options.roundsCount ?? TOTAL_ROUNDS
     scopeKey.value = options.scopeKey ?? options.scope ?? 'world'
-    scopeLabel.value = options.scopeLabel ?? ''
+    scopeParts.value = options.scopeParts ?? null
     dailyKey.value = options.daily ?? ''
     pool.value = options.pool
     totalRounds.value = Math.min(preferredRounds.value, options.pool.length)
@@ -255,7 +259,7 @@ export const useGameStore = defineStore('game', () => {
     regionFilter,
     timerEnabled,
     scopeKey,
-    scopeLabel,
+    scopeParts,
     dailyKey,
     score,
     streak,

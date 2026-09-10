@@ -20,6 +20,7 @@ const {
 const game = useGameStore()
 const { soundEnabled, toggleSound, playClick } = useAudio()
 const setup = useGameSetup()
+const { t } = useI18n()
 
 const showRules = ref(false)
 const stats = ref<StatsBlob>({ overall: { bestScore: 0, bestStreak: 0, bestAccuracy: 0, gamesPlayed: 0 }, byScope: {} })
@@ -72,7 +73,9 @@ const kabupatenProvinceOptions = computed<SearchOption[]>(() =>
 const regionFilterOptions = computed<SearchOption[]>(() => [
   {
     value: 'all',
-    label: setup.activeScope.value === 'id-provinces' ? 'Semua provinsi' : 'Semua benua',
+    label: setup.activeScope.value === 'id-provinces'
+      ? t('setup.filter.allProvinces')
+      : t('setup.filter.allContinents'),
     count: items.value.length,
   },
   ...regions.value.map(r => ({
@@ -111,12 +114,13 @@ const canStart = computed(() =>
 const daily = dailyChallenge()
 const dailyDone = ref<ReturnType<typeof dailyResult>>(null)
 
-const DAILY_SCOPE_LABEL: Record<string, string> = {
-  'world': 'Dunia',
-  'id-provinces': 'Provinsi',
-  'id-kabupaten': 'Kab/Kota',
-  'id-kecamatan': 'Kecamatan',
-}
+/** Nama cakupan singkat di kartu harian; ikut bahasa aktif. */
+const dailyScopeLabel = computed(() => {
+  if (daily.kind === 'world') return t('scope.world')
+  if (daily.kind === 'id-provinces') return t('scope.provinces')
+  if (daily.kind === 'id-kabupaten') return t('scope.kabupaten')
+  return t('scope.kecamatan')
+})
 
 /** Terapkan konfigurasi harian ke panel setup, lalu mulai. */
 async function startDaily() {
@@ -154,7 +158,7 @@ async function start(isDaily = false) {
     provinceName: setup.activeScope.value === 'id-kabupaten' ? setup.selectedProvince.value : '',
     cityName: setup.activeScope.value === 'id-kecamatan' ? (activeKecamatanCity.value?.city ?? '') : '',
     scopeKey: setup.scopeKey.value,
-    scopeLabel: setup.scopeLabel.value,
+    scopeParts: setup.scopeParts.value,
     daily: isDaily ? daily.key : '',
   })
   navigateTo({ path: '/play', query: { mode: setup.selectedMode.value } })
@@ -215,7 +219,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="min-w-0">
             <span class="font-display block truncate text-base font-black tracking-tight text-slate-900 dark:text-white">GeoGuesser</span>
-            <p class="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">Geografi Interaktif Dunia &amp; Indonesia</p>
+            <p class="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">{{ t('app.tagline') }}</p>
           </div>
         </div>
 
@@ -224,7 +228,7 @@ onBeforeUnmount(() => {
             type="button"
             class="focusable flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
             :aria-pressed="soundEnabled"
-            :title="soundEnabled ? 'Matikan suara efek' : 'Aktifkan suara efek'"
+            :title="soundEnabled ? t('common.sound.on') : t('common.sound.off')"
             @click="toggleSound"
           >
             <svg v-if="soundEnabled" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -238,6 +242,7 @@ onBeforeUnmount(() => {
             </svg>
           </button>
 
+          <LanguageToggle />
           <ThemeToggle />
         </div>
       </div>
@@ -250,24 +255,23 @@ onBeforeUnmount(() => {
         <div class="max-w-3xl">
           <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
             <span class="h-1.5 w-1.5 rounded-full bg-sky-500" />
-            Latihan peta &amp; batas wilayah, sepenuhnya offline
+            {{ t('home.badge') }}
           </div>
 
           <h1 class="font-display text-3xl font-black leading-tight tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-            Kenali bentuk &amp; letak
-            <span class="bg-gradient-to-r from-sky-500 via-indigo-500 to-cyan-400 bg-clip-text text-transparent">setiap wilayah</span>
+            {{ t('home.title.lead') }}
+            <span class="bg-gradient-to-r from-sky-500 via-indigo-500 to-cyan-400 bg-clip-text text-transparent">{{ t('home.title.accent') }}</span>
           </h1>
 
           <p class="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            Kuis geografi presisi tinggi — dari kecamatan di kotamu sampai negara di seberang benua.
-            Semua data batas wilayah tersimpan lokal, jadi bisa dimainkan tanpa koneksi.
+            {{ t('home.lede') }}
           </p>
 
           <div class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[11px]">
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇩 6.644 Kecamatan</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏙️ 514 Kab / Kota</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏛️ 38 Provinsi</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🌍 175 Negara</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇩 {{ t('home.chip.districts') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏙️ {{ t('home.chip.cities') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏛️ {{ t('home.chip.provinces') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🌍 {{ t('home.chip.countries') }}</span>
           </div>
         </div>
 
@@ -279,13 +283,13 @@ onBeforeUnmount(() => {
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <h2 id="daily-title" class="text-sm font-bold text-slate-900 dark:text-white">Tantangan Harian</h2>
+                <h2 id="daily-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('daily.title') }}</h2>
                 <span class="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-600 dark:text-amber-400">
                   {{ daily.key }}
                 </span>
               </div>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Satu konfigurasi yang sama untuk semua pemain hari ini.
+                {{ t('daily.subtitle') }}
               </p>
             </div>
             <span class="shrink-0 text-2xl" aria-hidden="true">🎯</span>
@@ -293,21 +297,21 @@ onBeforeUnmount(() => {
 
           <dl class="mt-4 grid grid-cols-3 gap-2 text-center">
             <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2">
-              <dt class="text-[10px] font-bold uppercase text-slate-400">Wilayah</dt>
+              <dt class="text-[10px] font-bold uppercase text-slate-400">{{ t('daily.col.scope') }}</dt>
               <dd class="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">
-                {{ DAILY_SCOPE_LABEL[daily.kind] }}
+                {{ dailyScopeLabel }}
               </dd>
             </div>
             <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2">
-              <dt class="text-[10px] font-bold uppercase text-slate-400">Mode</dt>
+              <dt class="text-[10px] font-bold uppercase text-slate-400">{{ t('daily.col.mode') }}</dt>
               <dd class="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">
-                {{ daily.mode === 'A' ? 'Klik Peta' : 'Pilih Nama' }}
+                {{ daily.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short') }}
               </dd>
             </div>
             <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2">
-              <dt class="text-[10px] font-bold uppercase text-slate-400">Waktu</dt>
+              <dt class="text-[10px] font-bold uppercase text-slate-400">{{ t('daily.col.time') }}</dt>
               <dd class="mt-0.5 truncate text-xs font-bold" :class="daily.timer ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'">
-                {{ daily.timer ? '15 dtk' : 'Santai' }}
+                {{ daily.timer ? t('common.secondsShort', { n: 15 }) : t('common.relax') }}
               </dd>
             </div>
           </dl>
@@ -315,7 +319,7 @@ onBeforeUnmount(() => {
           <div v-if="dailyDone" class="mt-4 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
             <span aria-hidden="true">✓</span>
             <span class="font-semibold text-emerald-700 dark:text-emerald-400">
-              Sudah selesai — {{ dailyDone.score }} poin ({{ dailyDone.accuracy }}%)
+              {{ t('daily.done', { score: dailyDone.score, accuracy: dailyDone.accuracy }) }}
             </span>
           </div>
 
@@ -325,7 +329,7 @@ onBeforeUnmount(() => {
             class="focusable mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 text-xs font-bold text-amber-700 dark:text-amber-300 transition hover:bg-amber-500/25 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             @click="startDaily"
           >
-            {{ dailyDone ? 'Main Ulang Tantangan' : 'Mainkan Tantangan Hari Ini' }}
+            {{ dailyDone ? t('daily.replay') : t('daily.play') }}
           </button>
         </section>
       </div>
@@ -335,7 +339,7 @@ onBeforeUnmount(() => {
         <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
-        <span>{{ error }}</span>
+        <span>{{ error === 'MAP_LOAD_FAILED' ? t('error.loadFailed') : error }}</span>
       </div>
 
       <!-- ══ Setup grid ══ -->
@@ -346,18 +350,18 @@ onBeforeUnmount(() => {
             <div class="flex min-w-0 items-center gap-3">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">1</span>
               <div class="min-w-0">
-                <h2 id="map-title" class="text-sm font-bold text-slate-900 dark:text-white">Pilih Wilayah</h2>
-                <p class="truncate text-xs text-slate-500 dark:text-slate-400">Tentukan peta dan tingkat cakupan yang mau diuji.</p>
+                <h2 id="map-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.title') }}</h2>
+                <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ t('setup.scope.subtitle') }}</p>
               </div>
             </div>
 
             <span class="hidden shrink-0 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400 sm:inline-flex">
-              {{ setup.poolSize.value }} wilayah siap
+              {{ t('setup.scope.poolReady', { n: setup.poolSize.value }) }}
             </span>
           </div>
 
           <!-- Dunia vs Indonesia -->
-          <div class="grid gap-3.5 sm:grid-cols-2" role="radiogroup" aria-label="Cakupan utama">
+          <div class="grid gap-3.5 sm:grid-cols-2" role="radiogroup" :aria-label="t('setup.scope.group')">
             <button
               type="button"
               role="radio"
@@ -376,8 +380,8 @@ onBeforeUnmount(() => {
                 </svg>
               </span>
               <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">Seluruh Dunia</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">175 negara lintas benua.</span>
+                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.world.title') }}</span>
+                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.world.desc') }}</span>
               </span>
               <span
                 v-if="setup.primaryScope.value === 'world'"
@@ -399,8 +403,8 @@ onBeforeUnmount(() => {
                 :class="setup.primaryScope.value === 'indonesia' ? 'border-rose-500/50 bg-rose-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
               >🇮🇩</span>
               <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">Indonesia</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">Provinsi, kab/kota, sampai kecamatan.</span>
+                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.indonesia.title') }}</span>
+                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.indonesia.desc') }}</span>
               </span>
               <span
                 v-if="setup.primaryScope.value === 'indonesia'"
@@ -416,27 +420,27 @@ onBeforeUnmount(() => {
             class="mt-5"
           >
             <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              {{ setup.activeScope.value === 'id-provinces' ? 'Saring kepulauan' : 'Saring benua' }}
+              {{ setup.activeScope.value === 'id-provinces' ? t('setup.filter.island') : t('setup.filter.continent') }}
             </label>
             <div class="mt-2 max-w-sm">
               <SearchSelect
                 v-model="setup.regionFilter.value"
                 :options="regionFilterOptions"
-                :label="setup.activeScope.value === 'id-provinces' ? 'Saring kepulauan' : 'Saring benua'"
-                :search-placeholder="setup.activeScope.value === 'id-provinces' ? 'Cari kepulauan…' : 'Cari benua…'"
+                :label="setup.activeScope.value === 'id-provinces' ? t('setup.filter.island') : t('setup.filter.continent')"
+                :search-placeholder="setup.activeScope.value === 'id-provinces' ? t('setup.filter.islandSearch') : t('setup.filter.continentSearch')"
               />
             </div>
           </div>
 
           <!-- Sub-opsi Indonesia -->
           <div v-if="setup.primaryScope.value === 'indonesia'" class="mt-5 space-y-4">
-            <div class="seg-track grid grid-cols-2 sm:grid-cols-4" role="radiogroup" aria-label="Tingkat wilayah Indonesia">
+            <div class="seg-track grid grid-cols-2 sm:grid-cols-4" role="radiogroup" :aria-label="t('setup.level.group')">
               <button
                 v-for="lvl in [
-                  { key: 'provinces' as const, icon: '🏛️', label: '38 Provinsi' },
-                  { key: 'kabupaten' as const, icon: '🏙️', label: 'Kab / Kota' },
-                  { key: 'kecamatan' as const, icon: '🏘️', label: 'Kecamatan' },
-                  { key: 'mixed' as const, icon: '🎲', label: 'Campuran' },
+                  { key: 'provinces' as const, icon: '🏛️', label: t('setup.level.provinces') },
+                  { key: 'kabupaten' as const, icon: '🏙️', label: t('setup.level.kabupaten') },
+                  { key: 'kecamatan' as const, icon: '🏘️', label: t('setup.level.kecamatan') },
+                  { key: 'mixed' as const, icon: '🎲', label: t('setup.level.mixed') },
                 ]"
                 :key="lvl.key"
                 type="button"
@@ -455,11 +459,11 @@ onBeforeUnmount(() => {
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-900 dark:text-white">Pilih Kabupaten / Kota</span>
-                    <span class="rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400">Level Mikro</span>
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.kec.title') }}</span>
+                    <span class="rounded-full bg-sky-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400">{{ t('setup.kec.tag') }}</span>
                   </div>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Cari kota mana pun di Indonesia untuk menebak batas kecamatannya.
+                    {{ t('setup.kec.desc') }}
                   </p>
                 </div>
 
@@ -467,8 +471,8 @@ onBeforeUnmount(() => {
                   <SearchSelect
                     v-model="setup.kecamatanProvince.value"
                     :options="provinceOptions"
-                    label="Pilih provinsi"
-                    search-placeholder="Cari provinsi…"
+                    :label="t('setup.kec.provinceLabel')"
+                    :search-placeholder="t('setup.kec.provinceSearch')"
                   />
                   <CityPicker
                     :cities="availableCities"
@@ -483,7 +487,7 @@ onBeforeUnmount(() => {
 
               <div class="space-y-2 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">DKI Jakarta:</span>
+                  <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ t('setup.kec.quickJakarta') }}</span>
                   <button
                     v-for="c in quickCities"
                     :key="c.id"
@@ -500,7 +504,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Kota lain:</span>
+                  <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ t('setup.kec.quickOther') }}</span>
                   <button
                     v-for="c in popularMajorCities"
                     :key="c.id"
@@ -523,10 +527,10 @@ onBeforeUnmount(() => {
                   <div class="flex min-w-0 items-center gap-2">
                     <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
                     <span class="truncate text-xs font-bold text-slate-900 dark:text-white">
-                      {{ activeCityDistricts.length }} kecamatan di {{ setup.cityShortName.value }}
+                      {{ t('setup.kec.previewCount', { n: activeCityDistricts.length, city: setup.cityShortName.value }) }}
                     </span>
                   </div>
-                  <span class="shrink-0 font-mono text-[10px] text-slate-500 dark:text-slate-400">Tersimpan offline</span>
+                  <span class="shrink-0 font-mono text-[10px] text-slate-500 dark:text-slate-400">{{ t('setup.kec.offline') }}</span>
                 </div>
 
                 <div class="mt-2.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pr-1">
@@ -545,22 +549,22 @@ onBeforeUnmount(() => {
             <div v-if="setup.indonesiaLevel.value === 'kabupaten'" class="space-y-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 p-4 shadow-sm sm:p-5">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
-                  <label class="text-xs font-bold text-slate-900 dark:text-white">Pilih provinsi induk</label>
-                  <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Soal diambil dari seluruh kab/kota di provinsi ini.</p>
+                  <label class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.kab.label') }}</label>
+                  <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ t('setup.kab.desc') }}</p>
                 </div>
 
                 <div class="w-full sm:w-64">
                   <SearchSelect
                     v-model="setup.selectedProvince.value"
                     :options="kabupatenProvinceOptions"
-                    label="Pilih provinsi"
-                    search-placeholder="Cari provinsi…"
+                    :label="t('setup.kec.provinceLabel')"
+                    :search-placeholder="t('setup.kec.provinceSearch')"
                   />
                 </div>
               </div>
 
               <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
-                <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Populer:</span>
+                <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ t('setup.kab.quick') }}</span>
                 <button
                   v-for="prov in quickProvinces"
                   :key="prov"
@@ -578,7 +582,7 @@ onBeforeUnmount(() => {
 
               <details class="group rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
                 <summary class="focusable flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white [&::-webkit-details-marker]:hidden">
-                  <span>Lihat {{ activeProvinceCities.length }} wilayah di {{ setup.selectedProvince.value }}</span>
+                  <span>{{ t('setup.kab.peek', { n: activeProvinceCities.length, province: setup.selectedProvince.value }) }}</span>
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                   </svg>
@@ -599,20 +603,20 @@ onBeforeUnmount(() => {
             <div v-if="setup.indonesiaLevel.value === 'mixed'" class="space-y-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 shadow-sm sm:p-5">
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-slate-900 dark:text-white">Mode campuran acak</span>
-                  <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Multi-tingkat</span>
+                  <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.mixed.title') }}</span>
+                  <span class="rounded-full bg-indigo-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{{ t('setup.mixed.tag') }}</span>
                 </div>
                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Tiap ronde berganti antara provinsi, kab/kota, dan kecamatan.
+                  {{ t('setup.mixed.desc') }}
                 </p>
               </div>
 
               <div class="grid grid-cols-3 gap-2">
                 <button
                   v-for="lvl in [
-                    { key: 'province' as const, label: 'Provinsi', icon: '🏛️', n: 38 },
-                    { key: 'kabupaten' as const, label: 'Kab/Kota', icon: '🏙️', n: 514 },
-                    { key: 'kecamatan' as const, label: 'Kecamatan', icon: '🏘️', n: setup.mixedCityCount.value * 13 },
+                    { key: 'province' as const, label: t('setup.mixed.province'), icon: '🏛️', n: 38 },
+                    { key: 'kabupaten' as const, label: t('setup.mixed.kabupaten'), icon: '🏙️', n: 514 },
+                    { key: 'kecamatan' as const, label: t('setup.mixed.kecamatan'), icon: '🏘️', n: setup.mixedCityCount.value * 13 },
                   ]"
                   :key="lvl.key"
                   type="button"
@@ -625,14 +629,14 @@ onBeforeUnmount(() => {
                 >
                   <span class="block text-base" aria-hidden="true">{{ lvl.icon }}</span>
                   <span class="mt-1 block text-xs font-bold">{{ lvl.label }}</span>
-                  <span class="mt-0.5 block font-mono text-[10px] opacity-80">±{{ lvl.n }} soal</span>
+                  <span class="mt-0.5 block font-mono text-[10px] opacity-80">{{ t('setup.mixed.estimate', { n: lvl.n }) }}</span>
                 </button>
               </div>
 
               <div v-if="setup.mixedLevels.value.kecamatan" class="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
                 <div class="flex items-baseline justify-between text-xs">
-                  <label for="mixed-cities" class="font-medium text-slate-700 dark:text-slate-300">Sumber kecamatan</label>
-                  <span class="font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ setup.mixedCityCount.value }} kota</span>
+                  <label for="mixed-cities" class="font-medium text-slate-700 dark:text-slate-300">{{ t('setup.mixed.sourceLabel') }}</label>
+                  <span class="font-mono font-bold text-indigo-600 dark:text-indigo-400">{{ t('setup.mixed.sourceValue', { n: setup.mixedCityCount.value }) }}</span>
                 </div>
                 <input
                   id="mixed-cities"
@@ -644,7 +648,7 @@ onBeforeUnmount(() => {
                   class="w-full cursor-pointer accent-indigo-600"
                 >
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                  Makin banyak kota, makin lama peta disiapkan sebelum sesi mulai.
+                  {{ t('setup.mixed.sourceHint') }}
                 </p>
               </div>
             </div>
@@ -658,16 +662,16 @@ onBeforeUnmount(() => {
             <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">2</span>
               <div>
-                <h2 id="mode-title" class="text-sm font-bold text-slate-900 dark:text-white">Mode Tantangan</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Pilih gaya interaksi permainan.</p>
+                <h2 id="mode-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.mode.title') }}</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('setup.mode.subtitle') }}</p>
               </div>
             </div>
 
-            <div class="grid gap-3" role="radiogroup" aria-label="Mode permainan">
+            <div class="grid gap-3" role="radiogroup" :aria-label="t('setup.mode.group')">
               <button
                 v-for="m in [
-                  { key: 'A' as const, title: 'Klik Petanya', desc: 'Nama muncul, cari lokasinya di peta.' },
-                  { key: 'B' as const, title: 'Tebak Nama', desc: 'Wilayah disorot, pilih namanya dari 4 opsi.' },
+                  { key: 'A' as const, title: t('setup.mode.a.title'), desc: t('setup.mode.a.desc') },
+                  { key: 'B' as const, title: t('setup.mode.b.title'), desc: t('setup.mode.b.desc') },
                 ]"
                 :key="m.key"
                 type="button"
@@ -715,15 +719,15 @@ onBeforeUnmount(() => {
             <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">3</span>
               <div>
-                <h2 id="session-title" class="text-sm font-bold text-slate-900 dark:text-white">Pengaturan Sesi</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Jumlah soal dan batas waktu tebakan.</p>
+                <h2 id="session-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.session.title') }}</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('setup.session.subtitle') }}</p>
               </div>
             </div>
 
             <div class="space-y-4">
               <div>
-                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Jumlah ronde</span>
-                <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Jumlah ronde">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ t('setup.session.rounds') }}</span>
+                <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" :aria-label="t('setup.session.roundsGroup')">
                   <button
                     v-for="count in setup.roundOptions.value"
                     :key="count.value"
@@ -750,10 +754,10 @@ onBeforeUnmount(() => {
               >
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
-                    <span class="text-xs font-bold text-slate-900 dark:text-white">Timer 15 detik</span>
-                    <span v-if="setup.timerEnabled.value" class="rounded-full bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-600 dark:text-amber-400">Aktif</span>
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.session.timer') }}</span>
+                    <span v-if="setup.timerEnabled.value" class="rounded-full bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ t('setup.session.timerOn') }}</span>
                   </div>
-                  <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Uji ketangkasan berpikir cepat.</p>
+                  <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ t('setup.session.timerHint') }}</p>
                 </div>
 
                 <div
@@ -775,15 +779,15 @@ onBeforeUnmount(() => {
                   :aria-expanded="showRules"
                   @click="showRules = !showRules"
                 >
-                  <span>Sistem penilaian skor</span>
+                  <span>{{ t('setup.session.rulesToggle') }}</span>
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" :class="showRules ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                   </svg>
                 </button>
                 <div v-if="showRules" class="mt-2 space-y-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                  <p><strong class="text-slate-900 dark:text-white">+10 poin</strong> untuk setiap tebakan tepat.</p>
-                  <p><strong class="text-slate-900 dark:text-white">+2 poin bonus</strong> per kenaikan streak beruntun.</p>
-                  <p><strong class="text-slate-900 dark:text-white">Salah tebak</strong> tidak mengurangi poin, hanya mereset streak.</p>
+                  <p><strong class="text-slate-900 dark:text-white">{{ t('setup.session.rule1.strong') }}</strong> {{ t('setup.session.rule1.rest') }}</p>
+                  <p><strong class="text-slate-900 dark:text-white">{{ t('setup.session.rule2.strong') }}</strong> {{ t('setup.session.rule2.rest') }}</p>
+                  <p><strong class="text-slate-900 dark:text-white">{{ t('setup.session.rule3.strong') }}</strong> {{ t('setup.session.rule3.rest') }}</p>
                 </div>
               </div>
             </div>
@@ -797,22 +801,22 @@ onBeforeUnmount(() => {
             aria-labelledby="record-title"
           >
             <div class="flex items-center justify-between gap-2">
-              <h2 id="record-title" class="text-sm font-bold text-slate-900 dark:text-white">Rekor kamu di sini</h2>
-              <span class="shrink-0 font-mono text-[10px] text-slate-500 dark:text-slate-400">{{ scopeRecord.gamesPlayed }}× main</span>
+              <h2 id="record-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('record.title') }}</h2>
+              <span class="shrink-0 font-mono text-[10px] text-slate-500 dark:text-slate-400">{{ t('record.plays', { n: scopeRecord.gamesPlayed }) }}</span>
             </div>
             <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ setup.scopeLabel.value }}</p>
 
             <div class="mt-3 grid grid-cols-3 gap-2 text-center">
               <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2.5">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Skor</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ t('record.score') }}</p>
                 <p class="font-mono mt-0.5 text-lg font-black text-slate-900 dark:text-white">{{ scopeRecord.bestScore }}</p>
               </div>
               <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2.5">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Streak</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ t('record.streak') }}</p>
                 <p class="font-mono mt-0.5 text-lg font-black text-amber-500">{{ scopeRecord.bestStreak }}</p>
               </div>
               <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2.5">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Akurasi</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ t('record.accuracy') }}</p>
                 <p class="font-mono mt-0.5 text-lg font-black text-sky-600 dark:text-sky-400">{{ scopeRecord.bestAccuracy }}%</p>
               </div>
             </div>
@@ -823,15 +827,15 @@ onBeforeUnmount(() => {
       <!-- Statistik keseluruhan -->
       <div v-if="stats.overall.gamesPlayed > 0" class="menu-rise mt-8 grid max-w-md grid-cols-3 gap-3" style="animation-delay: 200ms">
         <div class="step-card p-3 text-center">
-          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Skor tertinggi</p>
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ t('stats.bestScore') }}</p>
           <p class="font-mono mt-0.5 text-xl font-black text-slate-900 dark:text-white">{{ stats.overall.bestScore }}</p>
         </div>
         <div class="step-card p-3 text-center">
-          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Streak puncak</p>
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ t('stats.bestStreak') }}</p>
           <p class="font-mono mt-0.5 text-xl font-black text-amber-500">{{ stats.overall.bestStreak }} 🔥</p>
         </div>
         <div class="step-card p-3 text-center">
-          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total sesi</p>
+          <p class="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ t('stats.totalGames') }}</p>
           <p class="font-mono mt-0.5 text-xl font-black text-sky-600 dark:text-sky-400">{{ stats.overall.gamesPlayed }}</p>
         </div>
       </div>
@@ -850,7 +854,7 @@ onBeforeUnmount(() => {
         <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 lg:px-6">
           <div class="min-w-0 flex-1">
             <p class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-              Ringkasan misi
+              {{ t('launch.summary') }}
             </p>
             <dl class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
@@ -858,17 +862,17 @@ onBeforeUnmount(() => {
                   <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                 </svg>
-                <dt class="sr-only">Wilayah</dt>
+                <dt class="sr-only">{{ t('launch.scope') }}</dt>
                 <dd class="truncate font-semibold text-slate-900 dark:text-white">{{ setup.scopeLabel.value }}</dd>
               </div>
               <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
               <div class="flex items-center gap-1.5">
-                <dt class="text-slate-500 dark:text-slate-400">Mode</dt>
+                <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.mode') }}</dt>
                 <dd class="font-semibold text-slate-900 dark:text-white">{{ setup.modeLabel.value }}</dd>
               </div>
               <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
               <div class="flex items-center gap-1.5">
-                <dt class="text-slate-500 dark:text-slate-400">Ronde</dt>
+                <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.rounds') }}</dt>
                 <dd class="font-mono font-semibold text-slate-900 dark:text-white">
                   {{ setup.effectiveRounds.value }}
                   <span class="text-slate-400 dark:text-slate-500">/ {{ setup.poolSize.value }} {{ setup.unitLabel.value }}</span>
@@ -876,9 +880,9 @@ onBeforeUnmount(() => {
               </div>
               <span class="hidden text-slate-300 dark:text-slate-700 sm:inline" aria-hidden="true">•</span>
               <div class="hidden items-center gap-1.5 sm:flex">
-                <dt class="text-slate-500 dark:text-slate-400">Waktu</dt>
+                <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.time') }}</dt>
                 <dd class="font-semibold" :class="setup.timerEnabled.value ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
-                  {{ setup.timerEnabled.value ? '15 detik' : 'Santai' }}
+                  {{ setup.timerEnabled.value ? t('common.seconds', { n: 15 }) : t('common.relax') }}
                 </dd>
               </div>
             </dl>
@@ -895,7 +899,7 @@ onBeforeUnmount(() => {
               class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
               aria-hidden="true"
             />
-            <span>{{ pending || setup.mixedPending.value ? 'Menyiapkan peta…' : 'Mulai Main' }}</span>
+            <span>{{ pending || setup.mixedPending.value ? t('launch.preparing') : t('launch.start') }}</span>
             <span class="shadcn-kbd shadcn-kbd-on-accent hidden text-[10px] lg:inline-flex">Enter ↵</span>
             <svg v-if="!pending && !setup.mixedPending.value" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />

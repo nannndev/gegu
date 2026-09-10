@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const game = useGameStore()
 const { soundEnabled, toggleSound } = useAudio()
+const { t } = useI18n()
 
 const isFullscreen = ref(false)
 
@@ -58,13 +59,13 @@ onMounted(() => {
       ]"
       aria-live="polite"
     >
-      <span class="text-slate-500 dark:text-slate-400">Score</span>
+      <span class="text-slate-500 dark:text-slate-400">{{ t('hud.score') }}</span>
       <span class="font-mono font-bold hud-score-value text-sky-600 dark:text-sky-400">{{ game.score }}</span>
     </div>
 
     <!-- Round Counter -->
     <div class="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 px-3 text-xs font-medium shadow-md backdrop-blur-md">
-      <span class="text-slate-500 dark:text-slate-400">Round</span>
+      <span class="text-slate-500 dark:text-slate-400">{{ t('hud.round') }}</span>
       <span class="font-mono text-slate-900 dark:text-slate-100 font-bold">{{ game.currentRound }}</span>
       <span class="text-slate-300 dark:text-slate-600 font-mono">/</span>
       <span class="text-slate-500 dark:text-slate-400 font-mono">{{ game.totalRounds }}</span>
@@ -84,7 +85,7 @@ onMounted(() => {
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
-        <span>Streak</span>
+        <span>{{ t('hud.streak') }}</span>
         <span class="font-mono font-bold">{{ game.streak }}</span>
         <span v-if="game.streak >= 2" class="font-mono text-[10px] text-amber-600 dark:text-amber-400">
           (+{{ game.streak * 2 }})
@@ -110,7 +111,7 @@ onMounted(() => {
     <!-- Audio Toggle Button -->
     <button
       type="button"
-      :title="soundEnabled ? 'Mute' : 'Unmute'"
+      :title="soundEnabled ? t('hud.mute') : t('hud.unmute')"
       class="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 shadow-md backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-95"
       @click="toggleSound"
     >
@@ -129,7 +130,7 @@ onMounted(() => {
     <!-- Fullscreen Toggle Button -->
     <button
       type="button"
-      title="Fullscreen"
+      :title="t('hud.fullscreen')"
       class="pointer-events-auto hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 shadow-md backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-95"
       @click="toggleFullscreen"
     >

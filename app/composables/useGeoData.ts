@@ -172,7 +172,10 @@ export function useGeoData() {
       }
     }
     catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load map data.'
+      // Kode, bukan pesan: teksnya dirakit di UI mengikuti bahasa aktif.
+      // Pesan aslinya tetap dilempar ke konsol supaya bisa ditelusuri.
+      console.error('[geo] gagal memuat data peta', e)
+      error.value = 'MAP_LOAD_FAILED'
     }
     finally {
       pending.value = false

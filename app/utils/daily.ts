@@ -39,7 +39,6 @@ export interface DailyChallenge {
   mode: 'A' | 'B'
   rounds: number
   timer: boolean
-  label: string
 }
 
 /**
@@ -54,14 +53,8 @@ export function dailyChallenge(key = todayKey()): DailyChallenge {
   const timer = rand() > 0.55
   const rounds = 10
 
-  const LABELS: Record<DailyKind, string> = {
-    'world': 'Negara di dunia',
-    'id-provinces': '38 provinsi Indonesia',
-    'id-kabupaten': 'Kab/kota satu provinsi',
-    'id-kecamatan': 'Kecamatan satu kota',
-  }
-
-  return { key, kind, mode, rounds, timer, label: LABELS[kind] }
+  // Tanpa label teks: penamaan cakupan dirakit di UI supaya ikut bahasa aktif.
+  return { key, kind, mode, rounds, timer }
 }
 
 const DONE_KEY = 'geoguess_daily_done'

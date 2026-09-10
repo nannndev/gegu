@@ -4,6 +4,7 @@ import type { RegionItem } from '~/types/game'
 const game = useGameStore()
 const { load } = useGeoData()
 const { playCorrect, playWrong, playTick } = useAudio()
+const { t } = useI18n()
 
 const mapRef = ref<{
   mark: (id: string, kind: 'correct' | 'wrong' | 'target') => void
@@ -183,7 +184,7 @@ function confirmQuit() {
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
-        <span>Keluar</span>
+        <span>{{ t('play.quit') }}</span>
         <span class="shadcn-kbd text-[10px] hidden sm:inline-flex">
           Esc
         </span>
@@ -213,9 +214,9 @@ function confirmQuit() {
         @click.self="showExitModal = false"
       >
         <div class="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
-          <h3 class="font-display text-base font-bold text-slate-900 dark:text-white">Keluar dari sesi?</h3>
+          <h3 class="font-display text-base font-bold text-slate-900 dark:text-white">{{ t('play.exit.title') }}</h3>
           <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            Ronde ini berhenti dan skor sesi tidak akan disimpan.
+            {{ t('play.exit.body') }}
           </p>
 
           <div class="mt-6 flex items-center justify-end gap-2">
@@ -224,14 +225,14 @@ function confirmQuit() {
               class="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-3 text-xs font-medium text-slate-700 dark:text-slate-300 transition hover:bg-slate-200 dark:hover:bg-slate-700"
               @click="showExitModal = false"
             >
-              Lanjut main
+              {{ t('play.exit.stay') }}
             </button>
             <button
               type="button"
               class="inline-flex h-8 items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-500 px-3 text-xs font-medium text-white transition active:scale-95 shadow-sm"
               @click="confirmQuit"
             >
-              Keluar
+              {{ t('play.exit.confirm') }}
             </button>
           </div>
         </div>

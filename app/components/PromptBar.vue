@@ -5,6 +5,8 @@ import { isoToFlag } from '~/utils/geo'
 const emit = defineEmits<{ answer: [item: RegionItem] }>()
 
 const game = useGameStore()
+const { t } = useI18n()
+const { formatScope, shortCity } = useScopeLabel()
 const answered = computed(() => game.phase === 'answered')
 
 const hotkeys = ['A', 'B', 'C', 'D']
@@ -49,42 +51,37 @@ onBeforeUnmount(() => {
 })
 
 const challengeBadge = computed(() => {
-  if (game.datasetScope === 'id-kecamatan') {
-    return `${game.cityName || 'Kota'} · Kecamatan`
-  }
-  if (game.datasetScope === 'id-kabupaten') {
-    return `${game.provinceName || 'Provinsi'} · Kab/Kota`
-  }
-  if (game.datasetScope === 'id-provinces') {
-    return 'Indonesia · Provinsi'
-  }
-  return 'Dunia'
+  if (game.datasetScope === 'id-provinces') return t('prompt.badge.provinces')
+  if (game.datasetScope === 'world') return t('scope.world')
+  return formatScope({
+    scope: game.datasetScope,
+    provinceName: game.provinceName,
+    cityName: game.cityName,
+    mixedParts: game.scopeParts?.mixedParts,
+  })
 })
 
 const modeAInstruction = computed(() => {
-  if (game.datasetScope === 'id-kecamatan') {
-    return `Cari Kecamatan ${game.currentTarget?.name}, lalu klik wilayahnya di peta.`
-  }
-  if (game.datasetScope === 'id-kabupaten') {
-    return `Cari ${game.currentTarget?.name}, lalu klik wilayahnya di peta.`
-  }
-  if (game.datasetScope === 'id-provinces') {
-    return 'Klik batas provinsi ini di peta Indonesia.'
-  }
-  return 'Klik negara ini di peta dunia.'
+  const name = game.currentTarget?.name ?? ''
+  if (game.datasetScope === 'id-kecamatan') return t('prompt.a.kecamatan', { name })
+  if (game.datasetScope === 'id-kabupaten') return t('prompt.a.kabupaten', { name })
+  if (game.datasetScope === 'id-provinces') return t('prompt.a.provinces')
+  return t('prompt.a.world')
 })
 
 const modeBQuestion = computed(() => {
   if (game.datasetScope === 'id-kecamatan') {
-    return `Kecamatan mana yang sedang disorot di ${game.cityName || 'kota ini'}?`
+    return t('prompt.b.kecamatan', {
+      city: shortCity(game.cityName) || t('prompt.b.cityFallback'),
+    })
   }
   if (game.datasetScope === 'id-kabupaten') {
-    return `Wilayah mana yang sedang disorot di ${game.provinceName || 'provinsi ini'}?`
+    return t('prompt.b.kabupaten', {
+      province: game.provinceName || t('prompt.b.provinceFallback'),
+    })
   }
-  if (game.datasetScope === 'id-provinces') {
-    return 'Provinsi mana yang sedang disorot di peta?'
-  }
-  return 'Negara mana yang sedang disorot di peta?'
+  if (game.datasetScope === 'id-provinces') return t('prompt.b.provinces')
+  return t('prompt.b.world')
 })
 </script>
 
@@ -111,7 +108,7 @@ const modeBQuestion = computed(() => {
             {{ game.currentTarget.region }}
           </span>
           <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
-            +{{ game.nextPoints }} pts
+            {{ t('prompt.points', { n: game.nextPoints }) }}
           </span>
         </div>
       </div>
@@ -143,7 +140,7 @@ const modeBQuestion = computed(() => {
           </span>
         </div>
         <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
-          +{{ game.nextPoints }} pts
+          {{ t('prompt.points', { n: game.nextPoints }) }}
         </span>
       </div>
 
@@ -174,13 +171,13 @@ const modeBQuestion = computed(() => {
             v-if="answered && choice.id === game.currentTarget?.id"
             class="shrink-0 text-emerald-600 dark:text-emerald-400 font-bold text-xs"
           >
-            ✓ Benar
+            ✓ {{ t('common.correct') }}
           </span>
           <span
             v-else-if="answered && choice.id === game.lastAnswerId"
             class="shrink-0 text-rose-600 dark:text-rose-400 font-bold text-xs"
           >
-            ✗ Meleset
+            ✗ {{ t('common.wrong') }}
           </span>
         </button>
       </div>

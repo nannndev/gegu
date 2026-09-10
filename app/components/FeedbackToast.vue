@@ -4,17 +4,14 @@ import { isoToFlag } from '~/utils/geo'
 const emit = defineEmits<{ next: [] }>()
 
 const game = useGameStore()
+const { t } = useI18n()
 const fb = computed(() => game.feedback)
 
 const headline = computed(() => {
   if (!fb.value) return ''
-  if (fb.value.kind === 'correct') {
-    return `Benar (+${fb.value.points} poin)`
-  }
-  if (fb.value.kind === 'timeout') {
-    return 'Kehabisan waktu'
-  }
-  return 'Kurang pas'
+  if (fb.value.kind === 'correct') return t('feedback.correct', { n: fb.value.points })
+  if (fb.value.kind === 'timeout') return t('feedback.timeout')
+  return t('feedback.wrong')
 })
 
 const isLast = computed(() => game.currentRound >= game.totalRounds)
@@ -79,20 +76,20 @@ onBeforeUnmount(() => {
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
           >
-            Ronde {{ game.currentRound }} / {{ game.totalRounds }}
+            {{ t('feedback.roundOf', { current: game.currentRound, total: game.totalRounds }) }}
           </span>
         </div>
 
         <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
           <template v-if="fb.kind === 'correct'">
-            Yup, tepat sekali! Itu {{ fb.targetName }}.
+            {{ t('feedback.correctBody', { name: fb.targetName }) }}
           </template>
           <template v-else>
             <span v-if="fb.answerName" class="text-slate-500 dark:text-slate-400">
-              Kamu pilih <span class="text-slate-700 dark:text-slate-300 line-through">{{ fb.answerName }}</span>.
+              {{ t('feedback.youPicked') }} <span class="text-slate-700 dark:text-slate-300 line-through">{{ fb.answerName }}</span>.
             </span>
             <span>
-              Yang benar adalah <strong class="text-slate-900 dark:text-white font-semibold">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
+              {{ t('feedback.answerWas') }} <strong class="text-slate-900 dark:text-white font-semibold">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
             </span>
           </template>
         </p>
@@ -105,7 +102,7 @@ onBeforeUnmount(() => {
       class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-slate-900 dark:bg-white px-4 text-xs font-bold text-white dark:text-slate-950 transition hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 shadow-md"
       @click="emit('next')"
     >
-      <span>{{ isLast ? 'Lihat Skor' : 'Lanjut' }}</span>
+      <span>{{ isLast ? t('feedback.seeScore') : t('feedback.next') }}</span>
       <kbd class="hidden h-4 items-center rounded border border-white/20 dark:border-slate-900/20 bg-white/10 dark:bg-slate-900/10 px-1 font-mono text-[9px] text-white dark:text-slate-950 sm:inline-flex">
         Space ↵
       </kbd>
