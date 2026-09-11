@@ -3,7 +3,14 @@ import type { Feature, FeatureCollection, Geometry } from 'geojson'
 /** Mode permainan. A = cari di peta, B = tebak nama dari outline. */
 export type GameMode = 'A' | 'B'
 
-export type DatasetScope = 'world' | 'id-provinces' | 'id-kabupaten' | 'id-kecamatan' | 'id-mixed'
+export type DatasetScope =
+  | 'world'
+  | 'id-provinces'
+  | 'id-kabupaten'
+  | 'id-kecamatan'
+  | 'id-mixed'
+  | 'us-states'
+  | 'us-county'
 
 /** Level data wilayah: world, country, province, district (kecamatan). */
 export type RegionLevel = 'world' | 'country' | 'province' | 'district'
@@ -17,6 +24,12 @@ export interface RegionProperties {
   subregion?: string
   /** Ada di dataset kabupaten & kecamatan; dipakai untuk mewarnai backdrop peta. */
   country?: string
+  /** State induk sebuah county; sejajar dengan `province` di dataset Indonesia. */
+  state?: string
+  /** Nama tanpa satuan ("Brooks" dari "Brooks County"); hanya di dataset US. */
+  shortName?: string
+  /** Singkatan state, mis. "TX". */
+  abbr?: string
 }
 
 export type RegionFeature = Feature<Geometry, RegionProperties>
@@ -38,6 +51,8 @@ export interface RegionItem {
   level?: RegionLevel
   /** Kota asal item kecamatan, supaya file-nya bisa dimuat ulang. */
   cityId?: string
+  /** State asal item county, supaya file-nya bisa dimuat ulang. */
+  stateId?: string
 }
 
 /** Hasil satu ronde, untuk hitung akurasi di result screen. */

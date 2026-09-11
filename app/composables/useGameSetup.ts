@@ -1,8 +1,9 @@
 import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { DatasetScope, GameMode, RegionItem, RegionLevel } from '~/types/game'
 
-export type PrimaryScope = 'world' | 'indonesia'
+export type PrimaryScope = 'world' | 'indonesia' | 'us'
 export type IndonesiaLevel = 'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'
+export type UsLevel = 'states' | 'county'
 
 export interface MixedLevels {
   province: boolean
@@ -14,12 +15,14 @@ export interface MixedLevels {
 interface PersistedSetup {
   primaryScope: PrimaryScope
   indonesiaLevel: IndonesiaLevel
+  usLevel?: UsLevel
   mode: GameMode
   timerEnabled: boolean
   rounds: number
   regionFilter: string
   province: string
   cityId: string
+  stateId?: string
 }
 
 const STORAGE_KEY = 'geoguess_setup_v1'
@@ -39,8 +42,10 @@ export function useGameSetup() {
 
   const primaryScope = useState<PrimaryScope>('setup-primary', () => 'indonesia')
   const indonesiaLevel = useState<IndonesiaLevel>('setup-id-level', () => 'kecamatan')
+  const usLevel = useState<UsLevel>('setup-us-level', () => 'states')
   const selectedProvince = useState('setup-province', () => 'DKI Jakarta')
   const kecamatanProvince = useState('setup-kec-province', () => 'Daerah Khusus Ibukota Jakarta')
+  const usRegionFilter = useState('setup-us-region-filter', () => 'all')
   const regionFilter = useState('setup-region-filter', () => 'all')
   const selectedMode = useState<GameMode>('setup-mode', () => 'A')
   const timerEnabled = useState('setup-timer', () => false)
@@ -55,6 +60,9 @@ export function useGameSetup() {
 
   const activeScope = computed<DatasetScope>(() => {
     if (primaryScope.value === 'world') return 'world'
+    if (primaryScope.value === 'us') {
+      return usLevel.value === 'county' ? 'us-county' : 'us-states'
+    }
     if (indonesiaLevel.value === 'provinces') return 'id-provinces'
     if (indonesiaLevel.value === 'kabupaten') return 'id-kabupaten'
     if (indonesiaLevel.value === 'mixed') return 'id-mixed'
@@ -103,6 +111,8 @@ export function useGameSetup() {
   const scopeKey = computed(() => {
     const s = activeScope.value
     if (s === 'world') return regionFilter.value === 'all' ? 'world' : `world:${regionFilter.value}`
+    if (s === 'us-states') return regionFilter.value === 'all' ? 'us-states' : `us-states:${regionFilter.value}`
+    if (s === 'us-county') return `us-county:${geo.activeUsCountyState.value?.id ?? ''}`
     if (s === 'id-provinces') return 'id-provinces'
     if (s === 'id-kabupaten') return `id-kabupaten:${selectedProvince.value}`
     if (s === 'id-mixed') return 'id-mixed'
@@ -125,6 +135,7 @@ export function useGameSetup() {
       regionFilter: regionFilter.value,
       provinceName: selectedProvince.value,
       cityName: geo.activeKecamatanCity.value?.city ?? '',
+      stateName: geo.activeUsCountyState.value?.state ?? '',
       mixedParts: [...mixedParts],
     }
   })
@@ -142,7 +153,7 @@ export function useGameSetup() {
   /** Setel ulang filter & ronde setelah cakupan berganti. */
   async function syncScope() {
     const scope = activeScope.value
-    if (scope !== 'id-mixed') await geo.setScope(scope)
+    if (scope !== 'id-mixed') await geo.load(undefined, scope)
 
     if (scope === 'id-kabupaten') {
       regionFilter.value = selectedProvince.value
@@ -150,7 +161,7 @@ export function useGameSetup() {
     }
     else {
       regionFilter.value = 'all'
-      selectedRounds.value = scope === 'id-kecamatan'
+      selectedRounds.value = (scope === 'id-kecamatan' || scope === 'us-county')
         ? Math.min(10, poolSize.value || 8)
         : 10
     }
@@ -170,6 +181,13 @@ export function useGameSetup() {
     await syncScope()
   }
 
+  async function setUsLevel(level: UsLevel) {
+    if (usLevel.value === level) return
+    usLevel.value = level
+    playClick()
+    await syncScope()
+  }
+
   function setProvince(province: string) {
     selectedProvince.value = province
     if (activeScope.value === 'id-kabupaten') {
@@ -184,6 +202,15 @@ export function useGameSetup() {
     await geo.setKecamatanCity(cityId)
     const city = geo.activeKecamatanCity.value
     if (city) kecamatanProvince.value = city.province
+    regionFilter.value = 'all'
+    selectedRounds.value = Math.min(10, poolSize.value || 8)
+  }
+
+  async function setUsState(stateId: string) {
+    playClick()
+    await geo.setUsCountyState(stateId)
+    const state = geo.activeUsCountyState.value
+    if (state) usRegionFilter.value = state.region
     regionFilter.value = 'all'
     selectedRounds.value = Math.min(10, poolSize.value || 8)
   }
@@ -230,12 +257,14 @@ export function useGameSetup() {
     const blob: PersistedSetup = {
       primaryScope: primaryScope.value,
       indonesiaLevel: indonesiaLevel.value,
+      usLevel: usLevel.value,
       mode: selectedMode.value,
       timerEnabled: timerEnabled.value,
       rounds: selectedRounds.value,
       regionFilter: regionFilter.value,
       province: selectedProvince.value,
       cityId: geo.activeKecamatanCity.value?.id ?? '',
+      stateId: geo.activeUsCountyState.value?.id ?? '',
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
@@ -257,11 +286,14 @@ export function useGameSetup() {
     catch {}
     if (!saved) return
 
-    if (saved.primaryScope === 'world' || saved.primaryScope === 'indonesia') {
+    if (saved.primaryScope === 'world' || saved.primaryScope === 'indonesia' || saved.primaryScope === 'us') {
       primaryScope.value = saved.primaryScope
     }
     if (['provinces', 'kabupaten', 'kecamatan', 'mixed'].includes(saved.indonesiaLevel)) {
       indonesiaLevel.value = saved.indonesiaLevel
+    }
+    if (saved.usLevel === 'states' || saved.usLevel === 'county') {
+      usLevel.value = saved.usLevel
     }
     if (saved.mode === 'A' || saved.mode === 'B') selectedMode.value = saved.mode
     timerEnabled.value = Boolean(saved.timerEnabled)
@@ -272,6 +304,11 @@ export function useGameSetup() {
       await geo.setKecamatanCity(saved.cityId).catch(() => {})
       const city = geo.activeKecamatanCity.value
       if (city) kecamatanProvince.value = city.province
+    }
+    else if (scope === 'us-county' && saved.stateId) {
+      await geo.setUsCountyState(saved.stateId).catch(() => {})
+      const state = geo.activeUsCountyState.value
+      if (state) usRegionFilter.value = state.region
     }
     else if (scope !== 'id-mixed') {
       await geo.setScope(scope).catch(() => {})
@@ -291,8 +328,10 @@ export function useGameSetup() {
     // state
     primaryScope,
     indonesiaLevel,
+    usLevel,
     selectedProvince,
     kecamatanProvince,
+    usRegionFilter,
     regionFilter,
     selectedMode,
     timerEnabled,
@@ -316,8 +355,10 @@ export function useGameSetup() {
     // actions
     setPrimaryScope,
     setIndonesiaLevel,
+    setUsLevel,
     setProvince,
     setCity,
+    setUsState,
     setMode,
     toggleTimer,
     toggleMixedLevel,

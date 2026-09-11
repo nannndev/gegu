@@ -67,6 +67,7 @@ function playAgain() {
     scope: game.datasetScope,
     provinceName: game.provinceName,
     cityName: game.cityName,
+    stateName: game.stateName,
     scopeKey: game.scopeKey,
     scopeParts: game.scopeParts ?? undefined,
     // Ulangan tidak dihitung sebagai tantangan harian lagi — hasil harian
@@ -92,6 +93,7 @@ const scopeLabel = computed(() =>
     regionFilter: game.regionFilter,
     provinceName: game.provinceName,
     cityName: game.cityName,
+    stateName: game.stateName,
   }),
 )
 
@@ -101,6 +103,8 @@ const columnHeader = computed(() => {
   if (game.datasetScope === 'id-kabupaten') return t('setup.level.kabupaten')
   if (game.datasetScope === 'id-provinces') return t('scope.provinces')
   if (game.datasetScope === 'id-mixed') return t('unit.region')
+  if (game.datasetScope === 'us-states') return t('unit.state')
+  if (game.datasetScope === 'us-county') return t('unit.county')
   return t('unit.country')
 })
 

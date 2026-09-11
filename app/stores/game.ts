@@ -35,6 +35,7 @@ interface StartOptions {
   scope?: DatasetScope
   provinceName?: string
   cityName?: string
+  stateName?: string
   /** Kunci papan rekor; satu per cakupan soal. */
   scopeKey?: string
   /**
@@ -51,6 +52,7 @@ export const useGameStore = defineStore('game', () => {
   const datasetScope = ref<DatasetScope>('world')
   const provinceName = ref<string>('')
   const cityName = ref<string>('')
+  const stateName = ref<string>('')
   const regionFilter = ref('all')
   const timerEnabled = ref(false)
   const preferredRounds = ref(TOTAL_ROUNDS)
@@ -99,6 +101,7 @@ export const useGameStore = defineStore('game', () => {
     lastAnswerId.value = null
     feedback.value = null
     history.value = []
+    stateName.value = ''
     secondsLeft.value = ROUND_SECONDS
   }
 
@@ -175,6 +178,7 @@ export const useGameStore = defineStore('game', () => {
     datasetScope.value = options.scope ?? 'world'
     provinceName.value = options.provinceName ?? ''
     cityName.value = options.cityName ?? ''
+    stateName.value = options.stateName ?? ''
     regionFilter.value = options.regionFilter ?? 'all'
     timerEnabled.value = options.timerEnabled ?? false
     preferredRounds.value = options.roundsCount ?? TOTAL_ROUNDS
@@ -256,6 +260,7 @@ export const useGameStore = defineStore('game', () => {
     datasetScope,
     provinceName,
     cityName,
+    stateName,
     regionFilter,
     timerEnabled,
     scopeKey,

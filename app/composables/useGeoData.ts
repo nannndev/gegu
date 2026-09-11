@@ -29,6 +29,21 @@ export function toRegionItem(feature: RegionFeature): RegionItem {
   }
 }
 
+/** Satu state di indeks county. */
+export interface UsState {
+  id: string
+  file: string
+  state: string
+  abbr: string
+  region: string
+  count: number
+}
+
+interface UsCountyIndex {
+  regions: string[]
+  states: UsState[]
+}
+
 /** Satu kabupaten/kota di indeks kecamatan. */
 export interface KecamatanCity {
   id: string
@@ -59,6 +74,19 @@ function kecamatanLoader(file: string) {
   return entry?.[1] ?? null
 }
 
+/**
+ * County AS dipecah satu file per state (3.140 county total), pola yang sama
+ * dengan kecamatan: hanya state yang dipilih yang diunduh.
+ */
+const usCountyFiles = import.meta.glob<{ default: RegionCollection }>(
+  '~/assets/data/us-county/*.geo.json',
+)
+
+function usCountyLoader(file: string) {
+  const entry = Object.entries(usCountyFiles).find(([path]) => path.endsWith(`/${file}`))
+  return entry?.[1] ?? null
+}
+
 async function loadRegionSet(
   level: RegionLevel,
   code: DatasetScope = 'world',
@@ -68,7 +96,10 @@ async function loadRegionSet(
   if (cached) return cached
 
   let data: RegionCollection
-  if (code === 'id-kabupaten') {
+  if (code === 'us-states') {
+    data = (await import('~/assets/data/us-states.geo.json')).default as unknown as RegionCollection
+  }
+  else if (code === 'id-kabupaten') {
     data = (await import('~/assets/data/indonesia-kabupaten.geo.json')).default as unknown as RegionCollection
   }
   else if (code === 'id-provinces' || level === 'province') {
@@ -96,6 +127,10 @@ export function useGeoData() {
   const kecamatanIndex = useState<KecamatanIndex | null>('geo-kecamatan-index', () => null)
   /** Kabupaten/kota yang sedang dimuat di mode kecamatan. */
   const kecamatanCityId = useState<string | null>('geo-kecamatan-city', () => null)
+  /** Indeks ringan berisi daftar state AS beserta jumlah countynya. */
+  const usCountyIndex = useState<UsCountyIndex | null>('geo-us-county-index', () => null)
+  /** State AS yang sedang dimuat di mode county. */
+  const usCountyStateId = useState<string | null>('geo-us-county-state', () => null)
   const pending = useState('geo-pending', () => false)
   const error = useState<string | null>('geo-error', () => null)
 
@@ -107,10 +142,25 @@ export function useGeoData() {
     return kecamatanIndex.value
   }
 
+  /** Muat indeks county AS (daftar state); dipanggil sebelum memilih state. */
+  async function loadUsCountyIndex() {
+    if (usCountyIndex.value) return usCountyIndex.value
+    usCountyIndex.value = (await import('~/assets/data/us-county/index.json'))
+      .default as unknown as UsCountyIndex
+    return usCountyIndex.value
+  }
+
   /** Kota default kalau belum ada pilihan: Jakarta Pusat, atau kota pertama. */
   function defaultCityId(index: KecamatanIndex) {
     return index.cities.find(c => /Jakarta Pusat/i.test(c.city))?.id
       ?? index.cities[0]?.id
+      ?? null
+  }
+
+  /** State default kalau belum ada pilihan: California, atau state pertama. */
+  function defaultStateId(index: UsCountyIndex) {
+    return index.states.find(s => s.abbr === 'CA')?.id
+      ?? index.states[0]?.id
       ?? null
   }
 
@@ -139,16 +189,51 @@ export function useGeoData() {
     return data
   }
 
-  async function load(level?: RegionLevel, code?: DatasetScope, force = false, cityId?: string) {
+  /**
+   * Muat county satu state AS. Hanya file state itu yang diunduh.
+   */
+  async function loadUsCountyState(stateId: string) {
+    const index = await loadUsCountyIndex()
+    const state = index.states.find(s => s.id === stateId) ?? null
+    if (!state) throw new Error(`State "${stateId}" tidak ada di indeks county.`)
+
+    const key = `district:${state.id}`
+    const cached = cache.get(key)
+    if (cached) {
+      usCountyStateId.value = state.id
+      return cached
+    }
+
+    const loader = usCountyLoader(state.file)
+    if (!loader) throw new Error(`Data county ${state.state} tidak ditemukan.`)
+
+    const data = (await loader()).default as unknown as RegionCollection
+    cache.set(key, data)
+    usCountyStateId.value = state.id
+    return data
+  }
+
+  async function load(level?: RegionLevel, code?: DatasetScope, force = false, cityOrStateId?: string) {
     const targetScope = code ?? currentScope.value ?? 'world'
-    const targetLevel = level ?? (targetScope === 'id-kecamatan' ? 'district' : targetScope === 'id-kabupaten' || targetScope === 'id-provinces' ? 'province' : 'world')
+    const targetLevel = level ?? (
+      targetScope === 'id-kecamatan' || targetScope === 'us-county'
+        ? 'district'
+        : targetScope === 'id-kabupaten' || targetScope === 'id-provinces' || targetScope === 'us-states'
+          ? 'province'
+          : 'world'
+    )
 
     const targetCity = targetScope === 'id-kecamatan'
-      ? cityId ?? kecamatanCityId.value ?? defaultCityId(await loadKecamatanIndex())
+      ? cityOrStateId ?? kecamatanCityId.value ?? defaultCityId(await loadKecamatanIndex())
+      : null
+
+    const targetState = targetScope === 'us-county'
+      ? cityOrStateId ?? usCountyStateId.value ?? defaultStateId(await loadUsCountyIndex())
       : null
 
     const sameTarget = currentScope.value === targetScope
       && (targetScope !== 'id-kecamatan' || kecamatanCityId.value === targetCity)
+      && (targetScope !== 'us-county' || usCountyStateId.value === targetState)
     if (collection.value && sameTarget && !force) return collection.value
 
     pending.value = true
@@ -165,10 +250,17 @@ export function useGeoData() {
           localContext.value = await loadRegionSet('province', 'id-kabupaten')
         }
       }
+      else if (targetScope === 'us-county') {
+        collection.value = await loadUsCountyState(targetState!)
+        if (!localContext.value) {
+          localContext.value = await loadRegionSet('province', 'us-states')
+        }
+      }
       else {
         collection.value = await loadRegionSet(targetLevel, targetScope)
         localContext.value = null
         kecamatanCityId.value = null
+        usCountyStateId.value = null
       }
     }
     catch (e) {
@@ -185,7 +277,11 @@ export function useGeoData() {
 
   async function setScope(scope: DatasetScope) {
     if (currentScope.value === scope && collection.value) return
-    const level: RegionLevel = scope === 'id-kecamatan' ? 'district' : scope === 'id-kabupaten' ? 'province' : scope === 'id-provinces' ? 'province' : 'world'
+    const level: RegionLevel = (scope === 'id-kecamatan' || scope === 'us-county')
+      ? 'district'
+      : (scope === 'id-kabupaten' || scope === 'id-provinces' || scope === 'us-states')
+        ? 'province'
+        : 'world'
     await load(level, scope, true)
   }
 
@@ -193,6 +289,12 @@ export function useGeoData() {
   async function setKecamatanCity(cityId: string) {
     if (kecamatanCityId.value === cityId && collection.value) return
     await load('district', 'id-kecamatan', true, cityId)
+  }
+
+  /** Ganti state di mode county AS. */
+  async function setUsCountyState(stateId: string) {
+    if (usCountyStateId.value === stateId && collection.value) return
+    await load('district', 'us-county', true, stateId)
   }
 
   /**
@@ -280,6 +382,22 @@ export function useGeoData() {
     kecamatanIndex.value?.cities.find(c => c.id === kecamatanCityId.value) ?? null,
   )
 
+  /**
+   * Khusus us-county: seluruh state AS dari indeks county.
+   */
+  const availableStates = computed(() => {
+    if (currentScope.value !== 'us-county') return []
+    return usCountyIndex.value?.states ?? []
+  })
+
+  /** Daftar region Census AS di indeks county, untuk filter di UI. */
+  const usCountyRegions = computed(() => usCountyIndex.value?.regions ?? [])
+
+  /** State county yang sedang aktif. */
+  const activeUsCountyState = computed(() =>
+    usCountyIndex.value?.states.find(s => s.id === usCountyStateId.value) ?? null,
+  )
+
   function itemsInRegion(regionFilter: string) {
     if (regionFilter === 'all') return items.value
     return items.value.filter(i => i.region === regionFilter)
@@ -294,15 +412,22 @@ export function useGeoData() {
     regions,
     availableProvinces,
     availableCities,
+    availableStates,
+    usCountyRegions,
     kecamatanProvinces,
     kecamatanCityId,
     activeKecamatanCity,
+    usCountyStateId,
+    activeUsCountyState,
     pending,
     error,
     load,
     setScope,
     setKecamatanCity,
+    setUsCountyState,
     loadKecamatanIndex,
+    loadUsCountyIndex,
+    loadUsCountyState,
     buildMixedPool,
     loadKecamatanCity,
     loadRegionSet,

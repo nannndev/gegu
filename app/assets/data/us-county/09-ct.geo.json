@@ -1,0 +1,464 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09110",
+                "name": "Capitol Planning Region",
+                "name_id": "Capitol Planning Region",
+                "shortName": "Capitol",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -72.8637,
+                            42.0371
+                        ],
+                        [
+                            -72.8983,
+                            41.7232
+                        ],
+                        [
+                            -72.8531,
+                            41.5464
+                        ],
+                        [
+                            -72.7522,
+                            41.5789
+                        ],
+                        [
+                            -72.4667,
+                            41.5839
+                        ],
+                        [
+                            -72.1563,
+                            41.7535
+                        ],
+                        [
+                            -72.2054,
+                            42.0302
+                        ],
+                        [
+                            -72.8637,
+                            42.0371
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09120",
+                "name": "Greater Bridgeport Planning Region",
+                "name_id": "Greater Bridgeport Planning Region",
+                "shortName": "Greater Bridgeport",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -73.1833,
+                            41.3917
+                        ],
+                        [
+                            -73.3688,
+                            41.275
+                        ],
+                        [
+                            -73.2966,
+                            41.1137
+                        ],
+                        [
+                            -73.1012,
+                            41.1637
+                        ],
+                        [
+                            -73.0868,
+                            41.2546
+                        ],
+                        [
+                            -73.1833,
+                            41.3917
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09130",
+                "name": "Lower Connecticut River Valley Planning Region",
+                "name_id": "Lower Connecticut River Valley Planning Region",
+                "shortName": "Lower Connecticut River Valley",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -72.7522,
+                            41.5789
+                        ],
+                        [
+                            -72.5346,
+                            41.2538
+                        ],
+                        [
+                            -72.2484,
+                            41.2959
+                        ],
+                        [
+                            -72.3234,
+                            41.5343
+                        ],
+                        [
+                            -72.4667,
+                            41.5839
+                        ],
+                        [
+                            -72.7522,
+                            41.5789
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09140",
+                "name": "Naugatuck Valley Planning Region",
+                "name_id": "Naugatuck Valley Planning Region",
+                "shortName": "Naugatuck Valley",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -73.3189,
+                            41.5052
+                        ],
+                        [
+                            -73.1833,
+                            41.3917
+                        ],
+                        [
+                            -73.0868,
+                            41.2546
+                        ],
+                        [
+                            -73.0258,
+                            41.4596
+                        ],
+                        [
+                            -72.8531,
+                            41.5464
+                        ],
+                        [
+                            -72.8983,
+                            41.7232
+                        ],
+                        [
+                            -73.2614,
+                            41.6646
+                        ],
+                        [
+                            -73.3189,
+                            41.5052
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09150",
+                "name": "Northeastern Connecticut Planning Region",
+                "name_id": "Northeastern Connecticut Planning Region",
+                "shortName": "Northeastern Connecticut",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -72.2054,
+                            42.0302
+                        ],
+                        [
+                            -72.1563,
+                            41.7535
+                        ],
+                        [
+                            -71.8844,
+                            41.6412
+                        ],
+                        [
+                            -71.7936,
+                            41.5058
+                        ],
+                        [
+                            -71.7894,
+                            41.5969
+                        ],
+                        [
+                            -71.7897,
+                            41.7252
+                        ],
+                        [
+                            -71.7992,
+                            42.0081
+                        ],
+                        [
+                            -72.1357,
+                            42.0291
+                        ],
+                        [
+                            -72.2054,
+                            42.0302
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09160",
+                "name": "Northwest Hills Planning Region",
+                "name_id": "Northwest Hills Planning Region",
+                "shortName": "Northwest Hills",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -73.4873,
+                            42.0496
+                        ],
+                        [
+                            -73.5179,
+                            41.6667
+                        ],
+                        [
+                            -73.3189,
+                            41.5052
+                        ],
+                        [
+                            -73.2614,
+                            41.6646
+                        ],
+                        [
+                            -72.8983,
+                            41.7232
+                        ],
+                        [
+                            -72.8637,
+                            42.0371
+                        ],
+                        [
+                            -73.0534,
+                            42.0401
+                        ],
+                        [
+                            -73.4873,
+                            42.0496
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09170",
+                "name": "South Central Connecticut Planning Region",
+                "name_id": "South Central Connecticut Planning Region",
+                "shortName": "South Central Connecticut",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -73.0868,
+                            41.2546
+                        ],
+                        [
+                            -73.1012,
+                            41.1637
+                        ],
+                        [
+                            -72.9356,
+                            41.2585
+                        ],
+                        [
+                            -72.5346,
+                            41.2538
+                        ],
+                        [
+                            -72.7522,
+                            41.5789
+                        ],
+                        [
+                            -72.8531,
+                            41.5464
+                        ],
+                        [
+                            -73.0258,
+                            41.4596
+                        ],
+                        [
+                            -73.0868,
+                            41.2546
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09180",
+                "name": "Southeastern Connecticut Planning Region",
+                "name_id": "Southeastern Connecticut Planning Region",
+                "shortName": "Southeastern Connecticut",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -72.4667,
+                            41.5839
+                        ],
+                        [
+                            -72.3234,
+                            41.5343
+                        ],
+                        [
+                            -72.2484,
+                            41.2959
+                        ],
+                        [
+                            -71.8605,
+                            41.3202
+                        ],
+                        [
+                            -71.7936,
+                            41.5058
+                        ],
+                        [
+                            -71.8844,
+                            41.6412
+                        ],
+                        [
+                            -72.1563,
+                            41.7535
+                        ],
+                        [
+                            -72.4667,
+                            41.5839
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "USC-09190",
+                "name": "Western Connecticut Planning Region",
+                "name_id": "Western Connecticut Planning Region",
+                "shortName": "Western Connecticut",
+                "state": "Connecticut",
+                "region": "Connecticut",
+                "country": "United States of America"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            -73.5441,
+                            41.3665
+                        ],
+                        [
+                            -73.4827,
+                            41.2128
+                        ],
+                        [
+                            -73.7278,
+                            41.1007
+                        ],
+                        [
+                            -73.6573,
+                            40.9852
+                        ],
+                        [
+                            -73.2966,
+                            41.1137
+                        ],
+                        [
+                            -73.3688,
+                            41.275
+                        ],
+                        [
+                            -73.1833,
+                            41.3917
+                        ],
+                        [
+                            -73.3189,
+                            41.5052
+                        ],
+                        [
+                            -73.5179,
+                            41.6667
+                        ],
+                        [
+                            -73.5297,
+                            41.5272
+                        ],
+                        [
+                            -73.5441,
+                            41.3665
+                        ]
+                    ]
+                ]
+            }
+        }
+    ]
+}

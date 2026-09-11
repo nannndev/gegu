@@ -121,12 +121,20 @@ body {
   background: radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.14) 0%, rgba(245, 158, 11, 0.06) 45%, transparent 75%);
 }
 
+.bg-ambient-us {
+  background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, rgba(239, 68, 68, 0.05) 45%, transparent 75%);
+}
+
 .dark .bg-ambient-glow {
   background: radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.18) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%);
 }
 
 .dark .bg-ambient-indonesia {
   background: radial-gradient(circle at 50% -10%, rgba(244, 63, 94, 0.16) 0%, rgba(245, 158, 11, 0.07) 40%, transparent 70%);
+}
+
+.dark .bg-ambient-us {
+  background: radial-gradient(circle at 50% -10%, rgba(59, 130, 246, 0.18) 0%, rgba(239, 68, 68, 0.08) 40%, transparent 70%);
 }
 
 /*

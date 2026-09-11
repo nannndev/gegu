@@ -8,12 +8,16 @@ const {
   items,
   availableProvinces,
   availableCities,
+  availableStates,
+  usCountyRegions,
+  activeUsCountyState,
   kecamatanProvinces,
   activeKecamatanCity,
   worldContext,
   pending,
   error,
   load,
+  loadUsCountyIndex,
   itemsInRegion,
 } = useGeoData()
 
@@ -43,6 +47,12 @@ const popularMajorCities = computed(() => {
   )
 })
 
+/** Pintasan state AS populer untuk akses 1-klik. */
+const quickStates = computed(() => {
+  const topAbbrs = ['CA', 'TX', 'FL', 'NY', 'IL', 'PA']
+  return availableStates.value.filter(s => topAbbrs.includes(s.abbr))
+})
+
 /**
  * Provinsi di panel kecamatan. Kota pertama provinsi itu langsung dimuat,
  * karena daftar kota di bawahnya menyaring dari provinsi terpilih.
@@ -52,6 +62,23 @@ watch(setup.kecamatanProvince, async (prov) => {
   if (activeKecamatanCity.value?.province === prov) return
   const first = availableCities.value.find(c => c.province === prov)
   if (first) await setup.setCity(first.id)
+})
+
+/**
+ * Region Census di panel county AS. State pertama region itu langsung dimuat.
+ */
+watch(setup.usRegionFilter, async (reg) => {
+  if (setup.activeScope.value !== 'us-county') return
+  if (!reg || reg === 'all') return
+  if (activeUsCountyState.value?.region === reg) return
+  const first = availableStates.value.find(s => s.region === reg)
+  if (first) await setup.setUsState(first.id)
+})
+
+watch(() => setup.primaryScope.value, async (scope) => {
+  if (scope === 'us') {
+    await loadUsCountyIndex()
+  }
 })
 
 const provinceOptions = computed<SearchOption[]>(() =>
@@ -70,20 +97,35 @@ const kabupatenProvinceOptions = computed<SearchOption[]>(() =>
   })),
 )
 
-const regionFilterOptions = computed<SearchOption[]>(() => [
-  {
-    value: 'all',
-    label: setup.activeScope.value === 'id-provinces'
-      ? t('setup.filter.allProvinces')
-      : t('setup.filter.allContinents'),
-    count: items.value.length,
-  },
-  ...regions.value.map(r => ({
+const usRegionOptions = computed<SearchOption[]>(() => [
+  { value: 'all', label: t('setup.filter.allUsRegions'), count: availableStates.value.length },
+  ...usCountyRegions.value.map(r => ({
     value: r,
     label: r,
-    count: itemsInRegion(r).length,
+    count: availableStates.value.filter(s => s.region === r).length,
   })),
 ])
+
+const regionFilterOptions = computed<SearchOption[]>(() => {
+  const allLabel = setup.activeScope.value === 'us-states'
+    ? t('setup.filter.allUsRegions')
+    : setup.activeScope.value === 'id-provinces'
+      ? t('setup.filter.allProvinces')
+      : t('setup.filter.allContinents')
+
+  return [
+    {
+      value: 'all',
+      label: allLabel,
+      count: items.value.length,
+    },
+    ...regions.value.map(r => ({
+      value: r,
+      label: r,
+      count: itemsInRegion(r).length,
+    })),
+  ]
+})
 
 const activeProvinceCities = computed(() =>
   setup.activeScope.value === 'id-kabupaten'
@@ -93,6 +135,10 @@ const activeProvinceCities = computed(() =>
 
 const activeCityDistricts = computed(() =>
   setup.activeScope.value === 'id-kecamatan' ? itemsInRegion('all') : [],
+)
+
+const activeStateCounties = computed(() =>
+  setup.activeScope.value === 'us-county' ? itemsInRegion('all') : [],
 )
 
 /** Jaga agar jumlah ronde selalu ada di daftar pilihan yang tersedia. */
@@ -157,6 +203,7 @@ async function start(isDaily = false) {
     scope: setup.activeScope.value,
     provinceName: setup.activeScope.value === 'id-kabupaten' ? setup.selectedProvince.value : '',
     cityName: setup.activeScope.value === 'id-kecamatan' ? (activeKecamatanCity.value?.city ?? '') : '',
+    stateName: setup.activeScope.value === 'us-county' ? (activeUsCountyState.value?.state ?? '') : '',
     scopeKey: setup.scopeKey.value,
     scopeParts: setup.scopeParts.value,
     daily: isDaily ? daily.key : '',
@@ -202,7 +249,7 @@ onBeforeUnmount(() => {
       <div class="backdrop-vignette absolute inset-0" />
       <div
         class="absolute inset-0 transition-opacity duration-700"
-        :class="setup.primaryScope.value === 'world' ? 'bg-ambient-glow' : 'bg-ambient-indonesia'"
+        :class="setup.primaryScope.value === 'world' ? 'bg-ambient-glow' : setup.primaryScope.value === 'us' ? 'bg-ambient-us' : 'bg-ambient-indonesia'"
       />
     </div>
 
@@ -268,10 +315,10 @@ onBeforeUnmount(() => {
           </p>
 
           <div class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[11px]">
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇩 {{ t('home.chip.districts') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏙️ {{ t('home.chip.cities') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏛️ {{ t('home.chip.provinces') }}</span>
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🌍 {{ t('home.chip.countries') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇩 {{ t('home.chip.districts') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇺🇸 {{ t('home.chip.states') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏘️ {{ t('home.chip.counties') }}</span>
           </div>
         </div>
 
@@ -360,8 +407,8 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
-          <!-- Dunia vs Indonesia -->
-          <div class="grid gap-3.5 sm:grid-cols-2" role="radiogroup" :aria-label="t('setup.scope.group')">
+          <!-- Dunia vs Indonesia vs US -->
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" :aria-label="t('setup.scope.group')">
             <button
               type="button"
               role="radio"
@@ -412,22 +459,51 @@ onBeforeUnmount(() => {
                 aria-hidden="true"
               >✓</span>
             </button>
+
+            <button
+              type="button"
+              role="radio"
+              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
+              :aria-checked="setup.primaryScope.value === 'us'"
+              :class="setup.primaryScope.value === 'us' ? '!border-blue-500/60 !bg-blue-500/10 ring-2 ring-blue-500/20' : ''"
+              @click="setup.setPrimaryScope('us')"
+            >
+              <span
+                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
+                :class="setup.primaryScope.value === 'us' ? 'border-blue-500/50 bg-blue-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
+              >🇺🇸</span>
+              <span class="min-w-0 flex-1">
+                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.us.title') }}</span>
+                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.us.desc') }}</span>
+              </span>
+              <span
+                v-if="setup.primaryScope.value === 'us'"
+                class="shrink-0 text-sm font-bold text-blue-500"
+                aria-hidden="true"
+              >✓</span>
+            </button>
           </div>
 
-          <!-- Filter benua / kepulauan -->
+          <!-- Filter benua / kepulauan / region AS -->
           <div
-            v-if="setup.activeScope.value === 'world' || setup.activeScope.value === 'id-provinces'"
+            v-if="setup.activeScope.value === 'world' || setup.activeScope.value === 'id-provinces' || setup.activeScope.value === 'us-states'"
             class="mt-5"
           >
             <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              {{ setup.activeScope.value === 'id-provinces' ? t('setup.filter.island') : t('setup.filter.continent') }}
+              {{
+                setup.activeScope.value === 'us-states'
+                  ? t('setup.filter.usRegion')
+                  : setup.activeScope.value === 'id-provinces'
+                    ? t('setup.filter.island')
+                    : t('setup.filter.continent')
+              }}
             </label>
             <div class="mt-2 max-w-sm">
               <SearchSelect
                 v-model="setup.regionFilter.value"
                 :options="regionFilterOptions"
-                :label="setup.activeScope.value === 'id-provinces' ? t('setup.filter.island') : t('setup.filter.continent')"
-                :search-placeholder="setup.activeScope.value === 'id-provinces' ? t('setup.filter.islandSearch') : t('setup.filter.continentSearch')"
+                :label="setup.activeScope.value === 'us-states' ? t('setup.filter.usRegion') : setup.activeScope.value === 'id-provinces' ? t('setup.filter.island') : t('setup.filter.continent')"
+                :search-placeholder="setup.activeScope.value === 'us-states' ? t('setup.filter.usRegionSearch') : setup.activeScope.value === 'id-provinces' ? t('setup.filter.islandSearch') : t('setup.filter.continentSearch')"
               />
             </div>
           </div>
@@ -650,6 +726,98 @@ onBeforeUnmount(() => {
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">
                   {{ t('setup.mixed.sourceHint') }}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-opsi Amerika Serikat -->
+          <div v-if="setup.primaryScope.value === 'us'" class="mt-5 space-y-4">
+            <div class="seg-track grid grid-cols-2" role="radiogroup" :aria-label="t('setup.level.usGroup')">
+              <button
+                v-for="lvl in [
+                  { key: 'states' as const, icon: '🏛️', label: t('setup.level.usStates') },
+                  { key: 'county' as const, icon: '🏘️', label: t('setup.level.usCounty') },
+                ]"
+                :key="lvl.key"
+                type="button"
+                role="radio"
+                class="seg-item focusable justify-center text-center"
+                :aria-checked="setup.usLevel.value === lvl.key"
+                :class="setup.usLevel.value === lvl.key ? '!bg-white dark:!bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : ''"
+                @click="setup.setUsLevel(lvl.key)"
+              >
+                <span aria-hidden="true">{{ lvl.icon }}</span> {{ lvl.label }}
+              </button>
+            </div>
+
+            <!-- LEVEL: COUNTY PER STATE -->
+            <div v-if="setup.usLevel.value === 'county'" class="space-y-4 rounded-2xl border border-blue-500/20 bg-blue-500/[0.03] dark:bg-blue-950/20 p-4 shadow-sm sm:p-5">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.county.title') }}</span>
+                    <span class="rounded-full bg-blue-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400">{{ t('setup.county.tag') }}</span>
+                  </div>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('setup.county.desc') }}
+                  </p>
+                </div>
+
+                <div class="w-full space-y-2 sm:w-80">
+                  <SearchSelect
+                    v-model="setup.usRegionFilter.value"
+                    :options="usRegionOptions"
+                    :label="t('setup.county.regionLabel')"
+                    :search-placeholder="t('setup.county.regionSearch')"
+                  />
+                  <StatePicker
+                    :states="availableStates"
+                    :selected-id="activeUsCountyState?.id ?? null"
+                    :region="setup.usRegionFilter.value"
+                    :disabled="pending"
+                    @select="setup.setUsState"
+                  />
+                </div>
+              </div>
+
+              <div class="space-y-2 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="mr-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ t('setup.county.quickMajor') }}</span>
+                  <button
+                    v-for="s in quickStates"
+                    :key="s.id"
+                    type="button"
+                    class="focusable rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition"
+                    :aria-pressed="activeUsCountyState?.id === s.id"
+                    :class="activeUsCountyState?.id === s.id
+                      ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-blue-500/40'"
+                    @click="setup.setUsState(s.id)"
+                  >
+                    {{ s.state }} ({{ s.abbr }})
+                  </button>
+                </div>
+              </div>
+
+              <!-- Pratinjau county di state aktif -->
+              <div v-if="activeStateCounties.length" class="border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {{ t('setup.county.previewCount', { n: activeStateCounties.length, state: activeUsCountyState?.state ?? '' }) }}
+                  </span>
+                  <span class="font-mono text-[10px] text-slate-400">
+                    {{ t('setup.kec.offline') }}
+                  </span>
+                </div>
+                <div class="mt-2 flex max-h-24 flex-wrap gap-1 overflow-y-auto overscroll-contain pr-1">
+                  <span
+                    v-for="c in activeStateCounties"
+                    :key="c.id"
+                    class="rounded-md border border-slate-200/70 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+                  >
+                    {{ c.shortName ?? c.name }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

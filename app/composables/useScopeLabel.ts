@@ -10,6 +10,8 @@ export interface ScopeParts {
   provinceName?: string
   /** Nama kota; boleh masih berawalan "Kota"/"Kabupaten". */
   cityName?: string
+  /** Nama state AS; untuk mode county. */
+  stateName?: string
   mixedParts?: MixedPart[]
 }
 
@@ -33,6 +35,16 @@ export function useScopeLabel() {
 
     if (scope === 'world') {
       return regionFilter === 'all' ? t('scope.worldAll') : regionFilter
+    }
+    if (scope === 'us-states') {
+      return regionFilter === 'all'
+        ? t('scope.usStates')
+        : t('scope.usStatesFiltered', { region: regionFilter })
+    }
+    if (scope === 'us-county') {
+      return t('scope.usCounty', {
+        state: parts.stateName || t('scope.stateFallback'),
+      })
     }
     if (scope === 'id-provinces') {
       return regionFilter === 'all'
@@ -61,6 +73,8 @@ export function useScopeLabel() {
   /** Satuan wilayah untuk teks seperti "8 / 267 kecamatan". */
   function unitFor(scope: DatasetScope): string {
     if (scope === 'world') return t('unit.country')
+    if (scope === 'us-states') return t('unit.state')
+    if (scope === 'us-county') return t('unit.county')
     if (scope === 'id-provinces') return t('unit.province')
     if (scope === 'id-kabupaten') return t('unit.kabupaten')
     if (scope === 'id-mixed') return t('unit.region')

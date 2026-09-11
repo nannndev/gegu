@@ -53,10 +53,12 @@ onBeforeUnmount(() => {
 const challengeBadge = computed(() => {
   if (game.datasetScope === 'id-provinces') return t('prompt.badge.provinces')
   if (game.datasetScope === 'world') return t('scope.world')
+  if (game.datasetScope === 'us-states') return t('prompt.badge.usStates')
   return formatScope({
     scope: game.datasetScope,
     provinceName: game.provinceName,
     cityName: game.cityName,
+    stateName: game.stateName,
     mixedParts: game.scopeParts?.mixedParts,
   })
 })
@@ -66,6 +68,8 @@ const modeAInstruction = computed(() => {
   if (game.datasetScope === 'id-kecamatan') return t('prompt.a.kecamatan', { name })
   if (game.datasetScope === 'id-kabupaten') return t('prompt.a.kabupaten', { name })
   if (game.datasetScope === 'id-provinces') return t('prompt.a.provinces')
+  if (game.datasetScope === 'us-states') return t('prompt.a.usStates', { name })
+  if (game.datasetScope === 'us-county') return t('prompt.a.usCounty', { name })
   return t('prompt.a.world')
 })
 
@@ -81,6 +85,12 @@ const modeBQuestion = computed(() => {
     })
   }
   if (game.datasetScope === 'id-provinces') return t('prompt.b.provinces')
+  if (game.datasetScope === 'us-states') return t('prompt.b.usStates')
+  if (game.datasetScope === 'us-county') {
+    return t('prompt.b.usCounty', {
+      state: game.stateName || t('prompt.b.stateFallback'),
+    })
+  }
   return t('prompt.b.world')
 })
 </script>
@@ -93,7 +103,7 @@ const modeBQuestion = computed(() => {
         <div class="flex items-center gap-2">
           <span
             class="inline-flex h-2 w-2 rounded-full animate-pulse"
-            :class="game.datasetScope === 'world' ? 'bg-sky-500' : 'bg-rose-500'"
+            :class="game.datasetScope === 'world' ? 'bg-sky-500' : game.datasetScope.startsWith('us') ? 'bg-blue-500' : 'bg-rose-500'"
           />
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ challengeBadge }}

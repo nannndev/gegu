@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RegionItem } from '~/types/game'
+import { scopeProfile } from '~/utils/scopeProfile'
 
 const game = useGameStore()
 const { load } = useGeoData()
@@ -25,7 +26,11 @@ const targetScope = game.datasetScope || 'world'
 // Mode campuran memuat koleksinya per ronde di MapView (levelnya berganti),
 // jadi tidak ada satu scope yang bisa dimuat di muka.
 if (targetScope !== 'id-mixed') {
-  const targetLevel = targetScope === 'world' ? 'world' : targetScope === 'id-kecamatan' ? 'district' : 'province'
+  const targetLevel = targetScope === 'world'
+    ? 'world'
+    : (targetScope === 'id-kecamatan' || targetScope === 'us-county')
+      ? 'district'
+      : 'province'
   await load(targetLevel, targetScope)
 }
 
@@ -46,7 +51,7 @@ function renderRound() {
   // Mode campuran: kamera mengikuti wilayah soal, karena pool berisi
   // beberapa level sekaligus dan fitPool akan zoom keluar terlalu jauh.
   const isMixed = game.datasetScope === 'id-mixed'
-  const isLocal = game.datasetScope === 'id-kabupaten' || game.datasetScope === 'id-kecamatan'
+  const isLocal = scopeProfile(game.datasetScope).local
 
   if (game.mode === 'B') {
     map.setInteractive(false)

@@ -2,26 +2,29 @@ import type { Map as LeafletMap, GeoJSON, Layer, PathOptions, TileLayer } from '
 import type { RegionCollection, RegionFeature, RegionItem } from '~/types/game'
 import type { MapViewMode } from '~/composables/useMapView'
 import { FLAG_BORDER, flagFillFor } from '~/utils/flagPalette'
+import { scopeProfile } from '~/utils/scopeProfile'
 
 export type RegionMark = 'correct' | 'wrong' | 'target'
 
-const ID_SCOPES = new Set(['id', 'id-provinces', 'id-kabupaten', 'id-kecamatan'])
-const LOCAL_SCOPES = new Set(['id-kabupaten', 'id-kecamatan'])
-
-function isIdScope(scope: string) {
-  return ID_SCOPES.has(scope)
+/**
+ * Scope yang terkurung dalam satu negara: petanya digambar dengan gaya polos
+ * plus negara sekitar sebagai konteks, bukan isian warna bendera seperti
+ * mode dunia.
+ */
+function isCountryScope(scope: string) {
+  return scopeProfile(scope).country !== null
 }
 
 function isLocalScope(scope: string) {
-  return LOCAL_SCOPES.has(scope)
+  return scopeProfile(scope).local
 }
 
 /**
- * Scope yang koleksi aktifnya hanya mencakup sebagian kecil Indonesia
+ * Scope yang koleksi aktifnya hanya mencakup sebagian kecil negaranya
  * (kecamatan cuma satu kota), jadi daratan negaranya perlu digambar sebagai backdrop.
  */
 function needsCountryBackdrop(scope: string) {
-  return scope === 'id-kecamatan'
+  return scopeProfile(scope).countryBackdrop
 }
 
 interface Options {
@@ -72,14 +75,14 @@ export function useLeafletMap(
    */
   function baseStyleFor(item: RegionItem): PathOptions {
     const t = theme()
-    const isId = isIdScope(scope.value)
+    const isCountry = isCountryScope(scope.value)
     const isLocalMode = isLocalScope(scope.value)
     const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
 
     if (isLocalMode) {
       return isTargetPool ? { ...t.activeLocal } : { ...t.contextLocal }
     }
-    if (isId) return { ...t.baseId }
+    if (isCountry) return { ...t.baseId }
 
     if (t.flagWorld) {
       const flag = flagFillFor(item.iso ?? item.id)
@@ -113,8 +116,9 @@ export function useLeafletMap(
     }
 
     const t = theme()
-    const isId = isIdScope(scope.value)
+    const isCountry = isCountryScope(scope.value)
     const isLocalMode = isLocalScope(scope.value)
+    const country = scopeProfile(scope.value).country
 
     // Ubin peta (relief/satelit). Mode vektor & cetak biru tidak pakai ubin.
     if (tileLayer) {
@@ -133,19 +137,19 @@ export function useLeafletMap(
     // Warna kanvas & grid diatur lewat CSS variable di MapView, bukan di sini,
     // supaya aturan .leaflet-container di main.css tidak saling menimpa.
 
-    // Mode Indonesia: gambar negara sekitar sebagai latar. Kalau koleksi aktif
-    // hanya menutupi satu kota (kecamatan), daratan Indonesia ikut digambar
-    // supaya peta tidak tampak kosong di luar wilayah soal.
-    if (isId && options.worldContext?.value) {
-      // Daratan Indonesia digambar dari dataset kabupaten kalau tersedia: garis
-      // pantainya jauh lebih rapat daripada outline negara, yang pada zoom
-      // sekelas kota terlihat sebagai garis lurus.
+    // Mode satu negara: gambar negara sekitar sebagai latar. Kalau koleksi aktif
+    // hanya menutupi sebagian kecil negaranya (kecamatan satu kota), daratan
+    // negaranya ikut digambar supaya peta tidak tampak kosong di luar wilayah soal.
+    if (isCountry && country && options.worldContext?.value) {
+      // Daratan negara digambar dari dataset yang lebih rapat kalau tersedia:
+      // garis pantainya jauh lebih detail daripada outline negara, yang pada
+      // zoom sekelas kota terlihat sebagai garis lurus.
       const backdrop = needsCountryBackdrop(scope.value)
         ? options.localContext?.value ?? null
         : null
 
       const neighbours = options.worldContext.value.features.filter(
-        f => f.properties.name !== 'Indonesia',
+        f => f.properties.name !== country,
       )
       const contextFeatures = backdrop
         ? [...neighbours, ...backdrop.features]
@@ -155,9 +159,9 @@ export function useLeafletMap(
 
       contextLayer = L.geoJSON({ type: 'FeatureCollection', features: contextFeatures } as never, {
         style: (feature) => {
-          const isIndonesianLand = (feature as RegionFeature | undefined)?.properties.country === 'Indonesia'
-            || (feature as RegionFeature | undefined)?.properties.name === 'Indonesia'
-          return isIndonesianLand ? { ...t.contextLand } : { ...t.context }
+          const p = (feature as RegionFeature | undefined)?.properties
+          const isHomeLand = p?.country === country || p?.name === country
+          return isHomeLand ? { ...t.contextLand } : { ...t.context }
         },
         interactive: false,
       }).addTo(map)
@@ -206,21 +210,17 @@ export function useLeafletMap(
     if (!container.value || !collection.value || map) return
     L = await import('leaflet')
 
-    const isId = isIdScope(scope.value)
-    const isLocalMode = isLocalScope(scope.value)
-    const initialCenter: [number, number] = isId ? [-2.2, 118] : [20, 0]
-    const initialZoom = isId ? 5 : 2
-    const minZoom = isId ? 3.5 : 1.8
-    const maxZoom = isLocalMode ? 16 : isId ? 10 : 7
+    const profile = scopeProfile(scope.value)
+    const isLocalMode = profile.local
 
     map = L.map(container.value, {
-      center: initialCenter,
-      zoom: initialZoom,
-      minZoom,
-      maxZoom,
+      center: profile.center,
+      zoom: profile.zoom,
+      minZoom: profile.minZoom,
+      maxZoom: profile.maxZoom,
       zoomControl: false,
       attributionControl: false,
-      worldCopyJump: !isId,
+      worldCopyJump: profile.country === null,
     })
 
     setupLayers()
@@ -279,16 +279,22 @@ export function useLeafletMap(
     }
     if (!bounds) return false
 
-    const maxZoom = scope.value === 'id-kecamatan' ? 13 : 12
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom, animate })
+    map.fitBounds(bounds, {
+      padding: [50, 50],
+      maxZoom: scopeProfile(scope.value).fitPoolMaxZoom,
+      animate,
+    })
     return true
   }
 
   function fitRegion(id: string) {
     const layer = layerById.get(id) as unknown as { getBounds?: () => never } | undefined
     if (!map || !layer?.getBounds) return
-    const maxZoom = scope.value === 'id-kecamatan' ? 14 : scope.value === 'id-kabupaten' ? 12 : scope.value === 'id-provinces' ? 8 : 5
-    map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom, animate: true })
+    map.fitBounds(layer.getBounds(), {
+      padding: [60, 60],
+      maxZoom: scopeProfile(scope.value).fitRegionMaxZoom,
+      animate: true,
+    })
   }
 
   function fitPool(items: RegionItem[]) {
@@ -301,8 +307,11 @@ export function useLeafletMap(
       }
     }
     if (bounds.isValid()) {
-      const maxZoom = scope.value === 'id-kecamatan' ? 13 : 12
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom, animate: true })
+      map.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: scopeProfile(scope.value).fitPoolMaxZoom,
+        animate: true,
+      })
     }
   }
 
@@ -329,14 +338,9 @@ export function useLeafletMap(
   }
 
   function resetView() {
-    const isId = isIdScope(scope.value)
     if (isLocalScope(scope.value) && fitCollection()) return
-    if (isId) {
-      map?.setView([-2.2, 118], 5, { animate: true })
-    }
-    else {
-      map?.setView([20, 0], 2, { animate: true })
-    }
+    const profile = scopeProfile(scope.value)
+    map?.setView(profile.center, profile.zoom, { animate: true })
   }
 
   function zoomIn() {

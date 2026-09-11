@@ -1,0 +1,268 @@
+<script setup lang="ts">
+import type { UsState } from '~/composables/useGeoData'
+
+/**
+ * Pemilih state untuk mode county AS. Memiliki combobox dengan pencarian cepat
+ * (bisa cari nama state atau singkatan 2 huruf seperti "TX" atau "CA"),
+ * pengelompokan per region Census (Midwest, Northeast, South, West),
+ * dan navigasi keyboard penuh.
+ */
+const props = defineProps<{
+  states: UsState[]
+  selectedId: string | null
+  /** Region Census yang sedang difilter; kosong atau 'all' berarti semua. */
+  region?: string
+  disabled?: boolean
+}>()
+
+const emit = defineEmits<{
+  select: [stateId: string]
+}>()
+
+const { t } = useI18n()
+
+const open = ref(false)
+const query = ref('')
+const activeIndex = ref(0)
+const rootEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLInputElement | null>(null)
+const listEl = ref<HTMLElement | null>(null)
+/** Kalau ruang di bawah trigger sempit, dropdown dibuka ke atas. */
+const dropUp = ref(false)
+/** Tinggi list dibatasi sisa ruang viewport biar tidak terpotong. */
+const menuMaxHeight = ref(288)
+
+const selected = computed(() => props.states.find(s => s.id === props.selectedId) ?? null)
+
+/**
+ * Hasil pencarian. Tanpa query dan ada filter region, tampilkan state di region itu.
+ * Dengan query, pencarian menembus seluruh 50 state.
+ */
+const results = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  const activeRegion = props.region && props.region !== 'all' ? props.region : ''
+
+  if (!q) {
+    if (activeRegion) return props.states.filter(s => s.region === activeRegion)
+    return props.states
+  }
+
+  const scored: { state: UsState, rank: number }[] = []
+  for (const s of props.states) {
+    const name = s.state.toLowerCase()
+    const abbr = s.abbr.toLowerCase()
+    const reg = s.region.toLowerCase()
+
+    let rank = -1
+    if (abbr === q) rank = 0
+    else if (abbr.startsWith(q)) rank = 1
+    else if (name.startsWith(q)) rank = 2
+    else if (name.includes(q)) rank = 3
+    else if (reg.includes(q)) rank = 4
+
+    if (rank >= 0) scored.push({ state: s, rank })
+  }
+
+  return scored
+    .sort((a, b) => a.rank - b.rank || a.state.state.localeCompare(b.state.state))
+    .map(s => s.state)
+})
+
+/** Hasil dikelompokkan per region Census. */
+const grouped = computed(() => {
+  const groups: { region: string, states: UsState[] }[] = []
+  for (const s of results.value) {
+    const last = groups[groups.length - 1]
+    if (last && last.region === s.region) last.states.push(s)
+    else groups.push({ region: s.region, states: [s] })
+  }
+  return groups
+})
+
+const totalCounties = computed(() =>
+  results.value.reduce((sum, s) => sum + s.count, 0),
+)
+
+watch(results, () => { activeIndex.value = 0 })
+
+function openMenu() {
+  if (props.disabled) return
+  open.value = true
+  nextTick(() => {
+    const el = rootEl.value
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      const below = window.innerHeight - rect.bottom
+      dropUp.value = below < 240
+      menuMaxHeight.value = Math.max(160, Math.min(288, (dropUp.value ? rect.top - 8 : below) - 8))
+    }
+    inputEl.value?.focus()
+  })
+}
+
+function closeMenu() {
+  open.value = false
+  query.value = ''
+}
+
+function choose(st: UsState) {
+  emit('select', st.id)
+  closeMenu()
+}
+
+/** Gulirkan item aktif agar selalu terlihat saat navigasi keyboard. */
+function scrollActiveIntoView() {
+  nextTick(() => {
+    listEl.value?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (!open.value) {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      openMenu()
+    }
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeMenu()
+    return
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    const step = e.key === 'ArrowDown' ? 1 : -1
+    const n = results.value.length
+    if (!n) return
+    activeIndex.value = (activeIndex.value + step + n) % n
+    scrollActiveIntoView()
+    return
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    const st = results.value[activeIndex.value]
+    if (st) choose(st)
+  }
+}
+
+/** Indeks datar untuk menandai item aktif di dalam tampilan berkelompok. */
+function flatIndex(region: string, stateId: string) {
+  return results.value.findIndex(s => s.id === stateId && s.region === region)
+}
+
+function onDocumentClick(e: MouseEvent) {
+  if (!open.value) return
+  if (!rootEl.value?.contains(e.target as Node)) closeMenu()
+}
+
+onMounted(() => document.addEventListener('mousedown', onDocumentClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocumentClick))
+</script>
+
+<template>
+  <div ref="rootEl" class="relative">
+    <!-- Trigger button -->
+    <button
+      type="button"
+      class="focusable flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 px-3.5 py-2.5 text-left shadow-sm transition hover:border-sky-500/50 dark:hover:border-sky-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+      :disabled="disabled"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
+      @click="open ? closeMenu() : openMenu()"
+      @keydown="onKeydown"
+    >
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-xs font-bold text-slate-900 dark:text-slate-100">
+          {{ selected ? `${selected.state} (${selected.abbr})` : t('state.placeholder') }}
+        </span>
+        <span v-if="selected" class="block truncate text-[11px] text-slate-500 dark:text-slate-400">
+          {{ selected.region }} · <strong class="font-semibold text-sky-600 dark:text-sky-400">{{ t('state.countyCount', { n: selected.count }) }}</strong>
+        </span>
+      </span>
+      <div class="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+        <span v-if="!selected" class="text-[11px]">{{ t('state.searchHint') }}</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 transition-transform"
+          :class="open ? 'rotate-180 text-sky-500' : ''" viewBox="0 0 20 20" fill="currentColor"
+        >
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+        </svg>
+      </div>
+    </button>
+
+    <Transition
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 -translate-y-1 scale-95"
+      leave-active-class="transition duration-100 ease-in"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="open"
+        class="absolute z-50 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-xl"
+        :class="dropUp ? 'bottom-full mb-1.5' : 'mt-1.5'"
+      >
+        <div class="border-b border-slate-200/80 dark:border-white/10 p-2.5">
+          <div class="relative">
+            <input
+              ref="inputEl"
+              v-model="query"
+              type="text"
+              :placeholder="t('state.searchPlaceholder')"
+              :aria-label="t('state.searchAria')"
+              class="focusable w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950 py-2 pl-8 pr-3 text-xs text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 focus:border-sky-500 dark:focus:border-sky-400"
+              @keydown="onKeydown"
+            >
+            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <p class="mt-1.5 px-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+            <template v-if="query">
+              {{ t('state.resultsFound', { n: results.length, total: totalCounties }) }}
+            </template>
+            <template v-else>
+              {{ t('state.regionSummary', { region: props.region && props.region !== 'all' ? props.region : 'US', n: results.length }) }}
+            </template>
+          </p>
+        </div>
+
+        <div ref="listEl" role="listbox" class="overflow-y-auto overscroll-contain py-1" :style="{ maxHeight: `${menuMaxHeight}px` }">
+          <p v-if="!results.length" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            {{ t('state.noMatch', { query }) }}
+          </p>
+
+          <template v-for="group in grouped" :key="group.region">
+            <p class="sticky top-0 bg-slate-100/95 dark:bg-slate-800/95 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 backdrop-blur">
+              {{ group.region }}
+            </p>
+            <button
+              v-for="s in group.states"
+              :key="s.id"
+              type="button"
+              role="option"
+              :aria-selected="s.id === selectedId"
+              :data-active="flatIndex(group.region, s.id) === activeIndex"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left transition"
+              :class="[
+                flatIndex(group.region, s.id) === activeIndex ? 'bg-sky-50 dark:bg-sky-950/40' : '',
+                s.id === selectedId ? 'bg-sky-100/80 dark:bg-sky-900/40 font-bold text-sky-700 dark:text-sky-300' : 'text-slate-700 dark:text-slate-200',
+              ]"
+              @click="choose(s)"
+              @mouseenter="activeIndex = flatIndex(group.region, s.id)"
+            >
+              <span class="w-7 shrink-0 rounded bg-slate-100 dark:bg-slate-800 text-center text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 py-0.5">
+                {{ s.abbr }}
+              </span>
+              <span class="min-w-0 flex-1 truncate text-xs">{{ s.state }}</span>
+              <span class="shrink-0 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-slate-600 dark:text-slate-400">
+                {{ t('state.countyShort', { n: s.count }) }}
+              </span>
+              <span v-if="s.id === selectedId" class="shrink-0 text-xs font-bold text-sky-500" aria-hidden="true">✓</span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </Transition>
+  </div>
+</template>
