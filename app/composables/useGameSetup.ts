@@ -1,5 +1,6 @@
 import type { ScopeParts } from '~/composables/useScopeLabel'
-import type { DatasetScope, GameMode, RegionItem, RegionLevel } from '~/types/game'
+import type { DatasetScope, Difficulty, GameMode, RegionItem, RegionLevel } from '~/types/game'
+import { HARDCORE_SECONDS, ROUND_SECONDS } from '~/stores/game'
 
 export type PrimaryScope = 'world' | 'indonesia' | 'us'
 export type IndonesiaLevel = 'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'
@@ -17,6 +18,7 @@ interface PersistedSetup {
   indonesiaLevel: IndonesiaLevel
   usLevel?: UsLevel
   mode: GameMode
+  difficulty?: Difficulty
   timerEnabled: boolean
   rounds: number
   regionFilter: string
@@ -48,6 +50,7 @@ export function useGameSetup() {
   const usRegionFilter = useState('setup-us-region-filter', () => 'all')
   const regionFilter = useState('setup-region-filter', () => 'all')
   const selectedMode = useState<GameMode>('setup-mode', () => 'A')
+  const difficulty = useState<Difficulty>('setup-difficulty', () => 'normal')
   const timerEnabled = useState('setup-timer', () => false)
   const selectedRounds = useState('setup-rounds', () => 8)
   const mixedCityCount = useState('setup-mixed-cities', () => 4)
@@ -118,6 +121,18 @@ export function useGameSetup() {
     if (s === 'id-mixed') return 'id-mixed'
     return `id-kecamatan:${geo.activeKecamatanCity.value?.id ?? ''}`
   })
+
+  const isHardcore = computed(() => difficulty.value === 'hardcore')
+
+  /**
+   * Timer yang benar-benar berlaku. Hardcore selalu berwaktu, jadi togglenya
+   * dipaksa nyala — nilai `timerEnabled` pilihan pemain tetap disimpan apa
+   * adanya supaya kembali seperti semula begitu hardcore dimatikan.
+   */
+  const effectiveTimer = computed(() => isHardcore.value || timerEnabled.value)
+
+  /** Batas waktu satu ronde yang ditampilkan di ringkasan menu. */
+  const roundSeconds = computed(() => (isHardcore.value ? HARDCORE_SECONDS : ROUND_SECONDS))
 
   const unitLabel = computed(() => unitFor(activeScope.value))
 
@@ -222,7 +237,16 @@ export function useGameSetup() {
   }
 
   function toggleTimer() {
+    // Hardcore mengunci timernya; togglenya dinonaktifkan di UI, dan ini
+    // penjaga keduanya untuk pemanggil lain (mis. pintasan papan ketik).
+    if (isHardcore.value) return
     timerEnabled.value = !timerEnabled.value
+    playClick()
+  }
+
+  function setDifficulty(next: Difficulty) {
+    if (difficulty.value === next) return
+    difficulty.value = next
     playClick()
   }
 
@@ -259,6 +283,7 @@ export function useGameSetup() {
       indonesiaLevel: indonesiaLevel.value,
       usLevel: usLevel.value,
       mode: selectedMode.value,
+      difficulty: difficulty.value,
       timerEnabled: timerEnabled.value,
       rounds: selectedRounds.value,
       regionFilter: regionFilter.value,
@@ -296,6 +321,9 @@ export function useGameSetup() {
       usLevel.value = saved.usLevel
     }
     if (saved.mode === 'A' || saved.mode === 'B') selectedMode.value = saved.mode
+    if (saved.difficulty === 'normal' || saved.difficulty === 'hardcore') {
+      difficulty.value = saved.difficulty
+    }
     timerEnabled.value = Boolean(saved.timerEnabled)
     if (saved.province) selectedProvince.value = saved.province
 
@@ -334,6 +362,7 @@ export function useGameSetup() {
     usRegionFilter,
     regionFilter,
     selectedMode,
+    difficulty,
     timerEnabled,
     selectedRounds,
     mixedLevels,
@@ -342,6 +371,9 @@ export function useGameSetup() {
     mixedLevelCount,
     // derived
     activeScope,
+    isHardcore,
+    effectiveTimer,
+    roundSeconds,
     poolSize,
     effectiveRounds,
     roundOptions,
@@ -360,6 +392,7 @@ export function useGameSetup() {
     setCity,
     setUsState,
     setMode,
+    setDifficulty,
     toggleTimer,
     toggleMixedLevel,
     syncScope,

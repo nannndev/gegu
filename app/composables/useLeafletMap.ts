@@ -27,6 +27,13 @@ function needsCountryBackdrop(scope: string) {
   return scopeProfile(scope).countryBackdrop
 }
 
+/**
+ * Wilayah yang disembunyikan di hardcore. Layernya tetap dibuat — `mark()`
+ * masih harus bisa memunculkannya kembali saat jawaban terungkap — jadi yang
+ * dinolkan cuma tampilannya, bukan keberadaannya.
+ */
+const HIDDEN: PathOptions = { fillOpacity: 0, opacity: 0, weight: 0 }
+
 interface Options {
   onRegionClick?: (item: RegionItem) => void
   onMissClick?: () => void
@@ -39,6 +46,14 @@ interface Options {
   viewMode?: Ref<MapViewMode>
   /** Tema aplikasi; mode vektor punya padanan terang & gelap. */
   isDark?: Ref<boolean>
+  /** Mode hardcore: konteks dilucuti dan kamera dikunci. */
+  hardcore?: Ref<boolean>
+  /**
+   * Satu-satunya wilayah yang boleh terlihat. Diisi hanya di hardcore Mode B,
+   * di mana wilayah lain murni petunjuk: soalnya menyorot satu bentuk dan
+   * pemain memilih namanya, jadi tidak ada yang perlu diklik di peta.
+   */
+  soloTargetId?: Ref<string | null>
 }
 
 export function useLeafletMap(
@@ -51,6 +66,7 @@ export function useLeafletMap(
   const scope = options.scope ?? ref('world')
   const viewMode = options.viewMode ?? ref<MapViewMode>('vector')
   const isDark = options.isDark ?? ref(true)
+  const hardcore = options.hardcore ?? ref(false)
   /** Tema aktif; semua style poligon dibaca dari sini. */
   const theme = () => mapTheme(viewMode.value, isDark.value)
 
@@ -65,6 +81,18 @@ export function useLeafletMap(
   /** Jenis tanda per wilayah, supaya bisa digambar ulang setelah tema berganti. */
   const markKindById = new Map<string, RegionMark>()
 
+  /**
+   * Wilayah ini boleh terlihat? Di luar hardcore semuanya boleh; di hardcore
+   * hanya pool soal — dan di Mode B, hanya target rondenya.
+   */
+  function isVisible(id: string): boolean {
+    if (!hardcore.value) return true
+    const solo = options.soloTargetId?.value
+    if (solo) return id === solo
+    const poolIds = options.activePoolIds?.value
+    return !poolIds || poolIds.has(id)
+  }
+
   function styleFor(layer: Layer, style: PathOptions) {
     ;(layer as unknown as { setStyle: (s: PathOptions) => void }).setStyle(style)
   }
@@ -73,8 +101,12 @@ export function useLeafletMap(
    * Style dasar sebuah wilayah. Scope dunia memakai isian warna bendera
    * (mode tanpa ubin); mode lain memakai tema polos.
    */
-  function baseStyleFor(item: RegionItem): PathOptions {
+  function baseStyleFor(item: RegionItem, revealed = false): PathOptions {
     const t = theme()
+    // `revealed` dipakai untuk wilayah yang sudah dijawab: penyembunyian
+    // hardcore dilewati supaya pemain melihat letak yang benar.
+    const hidden = hardcore.value && !revealed
+    if (hidden && !isVisible(item.id)) return { ...HIDDEN }
     const isCountry = isCountryScope(scope.value)
     const isLocalMode = isLocalScope(scope.value)
     const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
@@ -84,7 +116,9 @@ export function useLeafletMap(
     }
     if (isCountry) return { ...t.baseId }
 
-    if (t.flagWorld) {
+    // Warna bendera praktis menyebut nama negaranya, jadi hardcore memakai
+    // isian polos meskipun temanya menyediakan bendera.
+    if (t.flagWorld && (!hardcore.value || revealed)) {
       const flag = flagFillFor(item.iso ?? item.id)
       if (flag) {
         return {
@@ -140,7 +174,9 @@ export function useLeafletMap(
     // Mode satu negara: gambar negara sekitar sebagai latar. Kalau koleksi aktif
     // hanya menutupi sebagian kecil negaranya (kecamatan satu kota), daratan
     // negaranya ikut digambar supaya peta tidak tampak kosong di luar wilayah soal.
-    if (isCountry && country && options.worldContext?.value) {
+    // Hardcore melewati seluruh layer konteks: daratan tetangga adalah
+    // petunjuk posisi terbesar yang tersisa setelah bendera dimatikan.
+    if (!hardcore.value && isCountry && country && options.worldContext?.value) {
       // Daratan negara digambar dari dataset yang lebih rapat kalau tersedia:
       // garis pantainya jauh lebih detail daripada outline negara, yang pada
       // zoom sekelas kota terlihat sebagai garis lurus.
@@ -185,6 +221,10 @@ export function useLeafletMap(
         layer.on({
           mouseover: () => {
             if (!interactive.value || marked.has(item.id) || (isLocalMode && !isTargetPool)) return
+            // Wilayah tersembunyi tidak boleh menyala saat disentuh kursor:
+            // kalau boleh, menyapu mouse ke seluruh peta jadi cara gratis
+            // menemukan wilayah yang justru sedang disembunyikan.
+            if (!isVisible(item.id)) return
             styleFor(layer, { ...baseStyle, ...t.hover })
             ;(layer as unknown as { bringToFront: () => void }).bringToFront()
           },
@@ -195,7 +235,9 @@ export function useLeafletMap(
           click: (e: { originalEvent?: Event }) => {
             if (!interactive.value) return
             e.originalEvent?.stopPropagation()
-            if (isLocalMode && !isTargetPool) {
+            // Wilayah tersembunyi diperlakukan seperti laut — klik di situ
+            // meleset, bukan menjawab sesuatu yang tidak terlihat pemain.
+            if ((isLocalMode && !isTargetPool) || !isVisible(item.id)) {
               options.onMissClick?.()
               return
             }
@@ -204,6 +246,28 @@ export function useLeafletMap(
         })
       },
     }).addTo(map)
+  }
+
+  /**
+   * Kunci kamera saat hardcore. Yang dimatikan hanya kendali pemain —
+   * `fitBounds` dan `setView` tetap jalan, jadi framing tiap ronde masih
+   * bisa memposisikan peta; pemain cuma tidak bisa menggesernya sendiri.
+   */
+  function applyCameraLock() {
+    if (!map) return
+    const lock = hardcore.value
+    const handlers = [
+      map.dragging,
+      map.scrollWheelZoom,
+      map.doubleClickZoom,
+      map.touchZoom,
+      map.boxZoom,
+      map.keyboard,
+    ]
+    for (const h of handlers) {
+      if (lock) h?.disable()
+      else h?.enable()
+    }
   }
 
   async function init() {
@@ -223,6 +287,8 @@ export function useLeafletMap(
       worldCopyJump: profile.country === null,
     })
 
+    applyCameraLock()
+
     setupLayers()
     if (isLocalMode) fitCollection(false)
 
@@ -239,7 +305,11 @@ export function useLeafletMap(
     marked.add(id)
     markKindById.set(id, kind)
     const item = itemById.get(id)
-    const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
+    // Tanda dibangun di atas style normal, bukan style hardcore: begitu ronde
+    // terjawab, wilayahnya justru harus muncul supaya pemain melihat letak
+    // yang benar. `HIDDEN` menolkan opacity, jadi menumpuknya di sini akan
+    // membuat jawaban benar tetap tak terlihat.
+    const baseStyle = item ? baseStyleFor(item, true) : { ...theme().baseWorld }
     styleFor(layer, { ...baseStyle, ...theme().mark[kind] })
     ;(layer as unknown as { bringToFront: () => void }).bringToFront()
   }
@@ -252,6 +322,38 @@ export function useLeafletMap(
       const baseStyle = item ? baseStyleFor(item) : { ...theme().baseWorld }
       styleFor(layer, { ...baseStyle })
     }
+  }
+
+  /**
+   * Padding fitBounds yang menyisakan ruang untuk bilah soal di bawah layar.
+   *
+   * Di mode normal wilayah yang tertutup bilah itu bisa digeser keluar oleh
+   * pemain, jadi padding simetris sudah cukup. Di hardcore kameranya terkunci:
+   * bentuk yang tertutup bilah tidak bisa diselamatkan, padahal bentuk itulah
+   * seluruh soalnya. Jadi ruang bawahnya dipesan di muka.
+   */
+  /**
+   * Tinggi yang ditempati bilah soal di bawah layar, dalam piksel.
+   *
+   * Diukur dari DOM, bukan ditebak: tingginya berubah menurut mode (Mode B
+   * punya empat tombol pilihan, Mode A tidak) dan menurut lebar layar. Angka
+   * tetap yang terlalu kecil membuat wilayah soal tetap tertutup — persis
+   * masalah yang fungsi ini ada untuk mencegahnya. Fallback 230px dipakai
+   * kalau bilahnya belum ter-render, dan hasilnya dibatasi 45% tinggi peta
+   * supaya wilayahnya tidak terdesak jadi titik kecil di layar pendek.
+   */
+  function promptReserve(): number {
+    const height = map?.getSize().y ?? 0
+    if (!height) return 0
+    const bar = document.querySelector('[data-prompt-bar]')
+    const measured = bar ? Math.round(bar.getBoundingClientRect().height) + 24 : 230
+    return Math.min(measured, Math.round(height * 0.45))
+  }
+
+  function fitPadding(base: number): { paddingTopLeft: [number, number], paddingBottomRight: [number, number] } {
+    const topLeft: [number, number] = [base, base]
+    if (!hardcore.value) return { paddingTopLeft: topLeft, paddingBottomRight: topLeft }
+    return { paddingTopLeft: topLeft, paddingBottomRight: [base, Math.max(base, promptReserve())] }
   }
 
   /**
@@ -280,7 +382,7 @@ export function useLeafletMap(
     if (!bounds) return false
 
     map.fitBounds(bounds, {
-      padding: [50, 50],
+      ...fitPadding(50),
       maxZoom: scopeProfile(scope.value).fitPoolMaxZoom,
       animate,
     })
@@ -291,7 +393,7 @@ export function useLeafletMap(
     const layer = layerById.get(id) as unknown as { getBounds?: () => never } | undefined
     if (!map || !layer?.getBounds) return
     map.fitBounds(layer.getBounds(), {
-      padding: [60, 60],
+      ...fitPadding(60),
       maxZoom: scopeProfile(scope.value).fitRegionMaxZoom,
       animate: true,
     })
@@ -308,7 +410,7 @@ export function useLeafletMap(
     }
     if (bounds.isValid()) {
       map.fitBounds(bounds, {
-        padding: [50, 50],
+        ...fitPadding(50),
         maxZoom: scopeProfile(scope.value).fitPoolMaxZoom,
         animate: true,
       })
@@ -334,20 +436,26 @@ export function useLeafletMap(
       return
     }
     const maxZoom = target.level === 'district' ? 12 : target.level === 'country' ? 9 : 6
-    map.fitBounds(bounds, { padding: [60, 60], maxZoom, animate: true })
+    map.fitBounds(bounds, { ...fitPadding(60), maxZoom, animate: true })
   }
 
   function resetView() {
     if (isLocalScope(scope.value) && fitCollection()) return
     const profile = scopeProfile(scope.value)
     map?.setView(profile.center, profile.zoom, { animate: true })
+    // Kamera terkunci: peta digeser naik setengah tinggi bilah soal supaya
+    // wilayah di lintang selatan tidak berakhir di balik bilah itu — di mode
+    // normal pemain tinggal menggesernya sendiri, di hardcore tidak bisa.
+    if (hardcore.value) map?.panBy([0, promptReserve() / 2], { animate: false })
   }
 
   function zoomIn() {
+    if (hardcore.value) return
     map?.zoomIn()
   }
 
   function zoomOut() {
+    if (hardcore.value) return
     map?.zoomOut()
   }
 
@@ -367,15 +475,16 @@ export function useLeafletMap(
     }
   })
 
-  // Ganti view mode atau tema hanya menukar ubin & warna — kamera dibiarkan di
-  // tempatnya supaya pemain tidak kehilangan posisi di tengah ronde.
-  watch([viewMode, isDark], () => {
+  // Ganti view mode, tema, atau kesulitan hanya menukar ubin & warna — kamera
+  // dibiarkan di tempatnya supaya pemain tidak kehilangan posisi di tengah ronde.
+  watch([viewMode, isDark, hardcore, () => options.soloTargetId?.value], () => {
     if (!ready.value) return
     // `setupLayers` mengosongkan `marked`, jadi jenis tandanya disalin dulu —
     // tanpa ini wilayah yang sudah dijawab kehilangan warna hijau/merahnya
     // begitu pemain mengganti tema di tengah ronde.
     const previous = [...markKindById.entries()]
     setupLayers()
+    applyCameraLock()
     for (const [id, kind] of previous) mark(id, kind)
   })
 
@@ -403,5 +512,5 @@ export function useLeafletMap(
     ready.value = false
   })
 
-  return { ready, interactive, mark, resetStyles, fitRegion, fitPool, fitCollection, fitSameLevel, resetView, zoomIn, zoomOut, invalidate }
+  return { ready, interactive, cameraLocked: hardcore, mark, resetStyles, fitRegion, fitPool, fitCollection, fitSameLevel, resetView, zoomIn, zoomOut, invalidate }
 }

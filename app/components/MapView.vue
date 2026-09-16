@@ -91,6 +91,17 @@ const activePoolIds = computed(() => {
   return null
 })
 
+const hardcore = computed(() => game.isHardcore)
+
+/**
+ * Hardcore Mode B: hanya wilayah soal yang digambar, mengambang di kanvas
+ * kosong. Di Mode A ini harus null — pemain masih perlu melihat kandidat
+ * lain untuk punya sesuatu yang bisa diklik.
+ */
+const soloTargetId = computed(() =>
+  hardcore.value && game.mode === 'B' ? game.currentTarget?.id ?? null : null,
+)
+
 const map = useLeafletMap(container, activeCollection, {
   onRegionClick: item => emit('pick', item),
   onMissClick: () => emit('miss'),
@@ -100,6 +111,8 @@ const map = useLeafletMap(container, activeCollection, {
   activePoolIds,
   viewMode,
   isDark,
+  hardcore,
+  soloTargetId,
 })
 
 const canvasColor = computed(() => mapTheme(viewMode.value, isDark.value).canvas)
@@ -233,9 +246,12 @@ defineExpose({
       </Transition>
     </div>
 
-    <!-- Floating Map Controls (icon button group) -->
+    <!--
+      Kontrol zoom hilang saat kamera dikunci: tombol yang terlihat tapi tidak
+      berefek lebih membingungkan daripada tombol yang memang tidak ada.
+    -->
     <div
-      v-if="map.ready.value"
+      v-if="map.ready.value && !hardcore"
       class="pointer-events-auto absolute bottom-24 right-4 z-[1050] flex flex-col gap-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1 shadow-md backdrop-blur-md sm:bottom-20"
     >
       <button

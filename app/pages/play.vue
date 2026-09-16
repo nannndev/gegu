@@ -38,7 +38,7 @@ const mapReady = ref(false)
 const showExitModal = ref(false)
 
 /** Re-render map according to current round */
-function renderRound() {
+async function renderRound() {
   const map = mapRef.value
   const target = game.currentTarget
   if (!map || !mapReady.value || !target) return
@@ -47,6 +47,11 @@ function renderRound() {
   if (map.roundReady?.value === false) return
 
   map.resetStyles()
+
+  // Framing hardcore mengukur tinggi bilah soal dari DOM, dan bilah ronde ini
+  // belum ter-render saat watcher menyala — tanpa jeda ini, yang terukur
+  // adalah bilah ronde sebelumnya (atau tidak ada sama sekali di ronde 1).
+  await nextTick()
 
   // Mode campuran: kamera mengikuti wilayah soal, karena pool berisi
   // beberapa level sekaligus dan fitPool akan zoom keluar terlalu jauh.
@@ -198,7 +203,12 @@ function confirmQuit() {
 
     <!-- Bottom Action Card -->
     <div class="pointer-events-none absolute inset-x-0 bottom-0 z-[1100] space-y-3 p-3 sm:p-5">
-      <div class="pointer-events-auto mx-auto w-full max-w-xl">
+      <!--
+        `data-prompt-bar` dibaca peta untuk memesan ruang di bawah kamera saat
+        hardcore: kameranya terkunci, jadi wilayah yang tertutup bilah ini
+        tidak bisa digeser keluar oleh pemain.
+      -->
+      <div data-prompt-bar class="pointer-events-auto mx-auto w-full max-w-xl">
         <Transition name="card-pop" mode="out-in">
           <FeedbackToast v-if="game.phase === 'answered'" key="feedback" @next="next" />
           <PromptBar v-else key="prompt" @answer="onChoice" />

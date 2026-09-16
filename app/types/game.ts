@@ -12,6 +12,13 @@ export type DatasetScope =
   | 'us-states'
   | 'us-county'
 
+/**
+ * Tingkat kesulitan. `hardcore` melucuti semua petunjuk selain bentuk wilayah
+ * itu sendiri: tetangga tidak digambar, kamera dikunci, waktunya dipotong,
+ * dan label benua/bendera di bilah soal disembunyikan.
+ */
+export type Difficulty = 'normal' | 'hardcore'
+
 /** Level data wilayah: world, country, province, district (kecamatan). */
 export type RegionLevel = 'world' | 'country' | 'province' | 'district'
 

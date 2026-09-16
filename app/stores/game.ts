@@ -1,18 +1,36 @@
 import { defineStore } from 'pinia'
 import type { ScopeParts } from '~/composables/useScopeLabel'
-import type { Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
+import type { Difficulty, Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 import { recordSession } from '~/utils/stats'
 import { saveDailyResult } from '~/utils/daily'
 
 export const TOTAL_ROUNDS = 10
 export const ROUND_SECONDS = 15
+/**
+ * Hardcore memotong waktu jadi setengahnya dan timernya tidak bisa dimatikan —
+ * tanpa tetangga dan tanpa zoom, satu-satunya cara masih menang adalah hafal
+ * bentuknya, dan itu tidak butuh 15 detik.
+ */
+export const HARDCORE_SECONDS = 7
 const BASE_POINTS = 10
 const STREAK_BONUS = 2
+/**
+ * Pengali skor hardcore. Rekornya dipisah per cakupan, bukan per kesulitan,
+ * jadi tanpa pengali sesi hardcore selalu kalah dari sesi normal di papan yang
+ * sama — orang jadi tidak punya alasan memilihnya.
+ */
+const HARDCORE_MULTIPLIER = 1.5
 const CHOICE_COUNT = 4
 
-/** `poin = 10 + (streak * 2)` — streak dihitung sebelum jawaban ini. */
-export function scoreFor(streak: number): number {
-  return BASE_POINTS + streak * STREAK_BONUS
+/** `poin = 10 + (streak * 2)`, ×1,5 di hardcore — streak dihitung sebelum jawaban ini. */
+export function scoreFor(streak: number, difficulty: Difficulty = 'normal'): number {
+  const base = BASE_POINTS + streak * STREAK_BONUS
+  return difficulty === 'hardcore' ? Math.round(base * HARDCORE_MULTIPLIER) : base
+}
+
+/** Panjang satu ronde; hardcore memakai batas waktunya sendiri. */
+export function secondsFor(difficulty: Difficulty): number {
+  return difficulty === 'hardcore' ? HARDCORE_SECONDS : ROUND_SECONDS
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -33,6 +51,7 @@ interface StartOptions {
   timerEnabled?: boolean
   roundsCount?: number
   scope?: DatasetScope
+  difficulty?: Difficulty
   provinceName?: string
   cityName?: string
   stateName?: string
@@ -54,6 +73,7 @@ export const useGameStore = defineStore('game', () => {
   const cityName = ref<string>('')
   const stateName = ref<string>('')
   const regionFilter = ref('all')
+  const difficulty = ref<Difficulty>('normal')
   const timerEnabled = ref(false)
   const preferredRounds = ref(TOTAL_ROUNDS)
   const scopeKey = ref('world')
@@ -87,7 +107,10 @@ export const useGameStore = defineStore('game', () => {
       ? Math.round((correctCount.value / history.value.length) * 100)
       : 0,
   )
-  const nextPoints = computed(() => scoreFor(streak.value))
+  const isHardcore = computed(() => difficulty.value === 'hardcore')
+  /** Panjang ronde yang berlaku di sesi ini. */
+  const roundSeconds = computed(() => secondsFor(difficulty.value))
+  const nextPoints = computed(() => scoreFor(streak.value, difficulty.value))
 
   function resetGame() {
     score.value = 0
@@ -102,7 +125,7 @@ export const useGameStore = defineStore('game', () => {
     feedback.value = null
     history.value = []
     stateName.value = ''
-    secondsLeft.value = ROUND_SECONDS
+    secondsLeft.value = roundSeconds.value
   }
 
   /**
@@ -173,6 +196,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function startGame(options: StartOptions) {
+    // Kesulitan disetel sebelum `resetGame`, karena reset mengisi sisa waktu
+    // dari `roundSeconds` — yang panjangnya ditentukan kesulitan.
+    difficulty.value = options.difficulty ?? 'normal'
     resetGame()
     mode.value = options.mode
     datasetScope.value = options.scope ?? 'world'
@@ -180,7 +206,8 @@ export const useGameStore = defineStore('game', () => {
     cityName.value = options.cityName ?? ''
     stateName.value = options.stateName ?? ''
     regionFilter.value = options.regionFilter ?? 'all'
-    timerEnabled.value = options.timerEnabled ?? false
+    // Hardcore selalu berwaktu; togglenya di menu dikunci saat mode ini aktif.
+    timerEnabled.value = isHardcore.value ? true : (options.timerEnabled ?? false)
     preferredRounds.value = options.roundsCount ?? TOTAL_ROUNDS
     scopeKey.value = options.scopeKey ?? options.scope ?? 'world'
     scopeParts.value = options.scopeParts ?? null
@@ -206,7 +233,7 @@ export const useGameStore = defineStore('game', () => {
     choices.value = mode.value === 'B' ? buildChoices(target) : []
     lastAnswerId.value = null
     feedback.value = null
-    secondsLeft.value = ROUND_SECONDS
+    secondsLeft.value = roundSeconds.value
     phase.value = 'playing'
   }
 
@@ -216,7 +243,7 @@ export const useGameStore = defineStore('game', () => {
     if (phase.value !== 'playing' || !target) return
 
     const correct = answerId === target.id
-    const points = correct ? scoreFor(streak.value) : 0
+    const points = correct ? scoreFor(streak.value, difficulty.value) : 0
 
     if (correct) {
       score.value += points
@@ -262,6 +289,9 @@ export const useGameStore = defineStore('game', () => {
     cityName,
     stateName,
     regionFilter,
+    difficulty,
+    isHardcore,
+    roundSeconds,
     timerEnabled,
     scopeKey,
     scopeParts,

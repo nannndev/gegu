@@ -51,6 +51,9 @@ onBeforeUnmount(() => {
 })
 
 const challengeBadge = computed(() => {
+  // Badge cakupan menyebut benua/provinsi/state — itu separuh jawabannya di
+  // Mode A. Hardcore menggantinya dengan penanda kesulitan saja.
+  if (game.isHardcore) return t('prompt.badge.hardcore')
   if (game.datasetScope === 'id-provinces') return t('prompt.badge.provinces')
   if (game.datasetScope === 'world') return t('scope.world')
   if (game.datasetScope === 'us-states') return t('prompt.badge.usStates')
@@ -103,7 +106,7 @@ const modeBQuestion = computed(() => {
         <div class="flex items-center gap-2">
           <span
             class="inline-flex h-2 w-2 rounded-full animate-pulse"
-            :class="game.datasetScope === 'world' ? 'bg-sky-500' : game.datasetScope.startsWith('us') ? 'bg-blue-500' : 'bg-rose-500'"
+            :class="game.isHardcore ? 'bg-rose-600' : game.datasetScope === 'world' ? 'bg-sky-500' : game.datasetScope.startsWith('us') ? 'bg-blue-500' : 'bg-rose-500'"
           />
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ challengeBadge }}
@@ -111,11 +114,12 @@ const modeBQuestion = computed(() => {
         </div>
 
         <div class="flex items-center gap-2">
+          <!-- Chip benua/provinsi mempersempit peta drastis, jadi hardcore memakainya sebagai tanda tanya. -->
           <span
             v-if="game.currentTarget"
             class="rounded-md border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
           >
-            {{ game.currentTarget.region }}
+            {{ game.isHardcore ? t('prompt.badge.hidden') : game.currentTarget.region }}
           </span>
           <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
             {{ t('prompt.points', { n: game.nextPoints }) }}
@@ -126,8 +130,9 @@ const modeBQuestion = computed(() => {
       <div class="mt-3 flex items-baseline justify-between gap-4">
         <div>
           <div class="flex items-center gap-2.5">
+            <!-- Bendera langsung menyebut negaranya; hardcore memakai tengkorak. -->
             <span class="text-2xl select-none" aria-hidden="true">
-              {{ game.datasetScope === 'world' ? (isoToFlag(game.currentTarget?.iso) || '🌐') : '🇮🇩' }}
+              {{ game.isHardcore ? '☠️' : game.datasetScope === 'world' ? (isoToFlag(game.currentTarget?.iso) || '🌐') : '🇮🇩' }}
             </span>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white drop-shadow-sm">
               {{ game.currentTarget?.name }}

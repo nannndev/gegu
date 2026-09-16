@@ -2,6 +2,7 @@
 import type { SearchOption } from '~/components/SearchSelect.vue'
 import { dailyChallenge, dailyResult } from '~/utils/daily'
 import { loadStats, statsForScope, type StatsBlob } from '~/utils/stats'
+import { HARDCORE_SECONDS } from '~/stores/game'
 
 const {
   regions,
@@ -181,6 +182,10 @@ async function startDaily() {
     )
   }
   setup.selectedMode.value = daily.mode
+  // Undian harian tidak menentukan kesulitan, jadi sesi harian selalu normal —
+  // kalau ikut hardcore yang tersimpan dari sesi lalu, skor "hari yang sama"
+  // jadi tidak sebanding antar pemain.
+  setup.difficulty.value = 'normal'
   setup.timerEnabled.value = daily.timer
   setup.selectedRounds.value = Math.min(daily.rounds, setup.poolSize.value)
   await start(true)
@@ -198,9 +203,10 @@ async function start(isDaily = false) {
     mode: setup.selectedMode.value,
     pool,
     regionFilter: setup.regionFilter.value,
-    timerEnabled: setup.timerEnabled.value,
+    timerEnabled: setup.effectiveTimer.value,
     roundsCount: setup.selectedRounds.value,
     scope: setup.activeScope.value,
+    difficulty: setup.difficulty.value,
     provinceName: setup.activeScope.value === 'id-kabupaten' ? setup.selectedProvince.value : '',
     cityName: setup.activeScope.value === 'id-kecamatan' ? (activeKecamatanCity.value?.city ?? '') : '',
     stateName: setup.activeScope.value === 'us-county' ? (activeUsCountyState.value?.state ?? '') : '',
@@ -913,29 +919,94 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
+              <!--
+                Pemilih kesulitan. Hardcore melucuti empat petunjuk sekaligus,
+                jadi konsekuensinya dirinci di kartu — pemain yang kaget
+                setengah sesi akan menyalahkan game-nya, bukan pilihannya.
+              -->
+              <div>
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ t('setup.difficulty.label') }}</span>
+                <div class="mt-2 grid grid-cols-2 gap-2" role="radiogroup" :aria-label="t('setup.difficulty.label')">
+                  <button
+                    type="button"
+                    role="radio"
+                    class="focusable rounded-xl border p-3 text-left transition"
+                    :aria-checked="!setup.isHardcore.value"
+                    :class="!setup.isHardcore.value
+                      ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-slate-300 dark:hover:border-slate-700'"
+                    @click="setup.setDifficulty('normal')"
+                  >
+                    <span class="block text-xs font-bold" :class="!setup.isHardcore.value ? 'text-sky-600 dark:text-sky-400' : 'text-slate-900 dark:text-white'">
+                      {{ t('setup.difficulty.normal.title') }}
+                    </span>
+                    <span class="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                      {{ t('setup.difficulty.normal.desc') }}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    class="focusable rounded-xl border p-3 text-left transition"
+                    :aria-checked="setup.isHardcore.value"
+                    :class="setup.isHardcore.value
+                      ? 'border-rose-500 bg-rose-500/10 ring-2 ring-rose-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-slate-300 dark:hover:border-slate-700'"
+                    @click="setup.setDifficulty('hardcore')"
+                  >
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      <span class="text-xs font-bold" :class="setup.isHardcore.value ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'">
+                        ☠️ {{ t('setup.difficulty.hardcore.title') }}
+                      </span>
+                      <span class="rounded-full bg-rose-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-rose-600 dark:text-rose-400">
+                        {{ t('setup.difficulty.hardcore.badge') }}
+                      </span>
+                    </span>
+                    <span class="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                      {{ t('setup.difficulty.hardcore.desc', { n: HARDCORE_SECONDS }) }}
+                    </span>
+                  </button>
+                </div>
+
+                <ul
+                  v-if="setup.isHardcore.value"
+                  class="mt-2 space-y-1 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400"
+                >
+                  <li>· {{ t('setup.difficulty.hardcore.rule1') }}</li>
+                  <li>· {{ t('setup.difficulty.hardcore.rule2') }}</li>
+                  <li>· {{ t('setup.difficulty.hardcore.rule3', { n: HARDCORE_SECONDS }) }}</li>
+                  <li>· {{ t('setup.difficulty.hardcore.rule4') }}</li>
+                </ul>
+              </div>
+
+              <!-- Toggle timer dikunci saat hardcore: mode itu selalu berwaktu. -->
               <button
                 type="button"
                 role="switch"
-                class="focusable flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3.5 text-left transition hover:border-sky-500/40"
-                :aria-checked="setup.timerEnabled.value"
+                :disabled="setup.isHardcore.value"
+                class="focusable flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3.5 text-left transition hover:border-sky-500/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-slate-200 dark:disabled:hover:border-slate-800"
+                :aria-checked="setup.effectiveTimer.value"
                 @click="setup.toggleTimer"
               >
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t('setup.session.timer') }}</span>
-                    <span v-if="setup.timerEnabled.value" class="rounded-full bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ t('setup.session.timerOn') }}</span>
+                    <span v-if="setup.effectiveTimer.value" class="rounded-full bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-600 dark:text-amber-400">{{ t('setup.session.timerOn') }}</span>
                   </div>
-                  <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ t('setup.session.timerHint') }}</p>
+                  <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ setup.isHardcore.value ? t('setup.session.timerLocked') : t('setup.session.timerHint') }}
+                  </p>
                 </div>
 
                 <div
                   class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
-                  :class="setup.timerEnabled.value ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'"
+                  :class="setup.effectiveTimer.value ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'"
                   aria-hidden="true"
                 >
                   <span
                     class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
-                    :class="setup.timerEnabled.value ? 'translate-x-[1.125rem]' : 'translate-x-[0.1875rem]'"
+                    :class="setup.effectiveTimer.value ? 'translate-x-[1.125rem]' : 'translate-x-[0.1875rem]'"
                   />
                 </div>
               </button>
@@ -1037,6 +1108,12 @@ onBeforeUnmount(() => {
               <div class="flex items-center gap-1.5">
                 <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.mode') }}</dt>
                 <dd class="font-semibold text-slate-900 dark:text-white">{{ setup.modeLabel.value }}</dd>
+                <span
+                  v-if="setup.isHardcore.value"
+                  class="rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-rose-600 dark:text-rose-400"
+                >
+                  ☠️ {{ t('setup.difficulty.hardcore.title') }}
+                </span>
               </div>
               <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
               <div class="flex items-center gap-1.5">
@@ -1049,8 +1126,8 @@ onBeforeUnmount(() => {
               <span class="hidden text-slate-300 dark:text-slate-700 sm:inline" aria-hidden="true">•</span>
               <div class="hidden items-center gap-1.5 sm:flex">
                 <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.time') }}</dt>
-                <dd class="font-semibold" :class="setup.timerEnabled.value ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
-                  {{ setup.timerEnabled.value ? t('common.seconds', { n: 15 }) : t('common.relax') }}
+                <dd class="font-semibold" :class="setup.effectiveTimer.value ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
+                  {{ setup.effectiveTimer.value ? t('common.seconds', { n: setup.roundSeconds.value }) : t('common.relax') }}
                 </dd>
               </div>
             </dl>

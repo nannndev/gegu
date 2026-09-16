@@ -65,6 +65,7 @@ function playAgain() {
     timerEnabled: game.timerEnabled,
     roundsCount: game.totalRounds,
     scope: game.datasetScope,
+    difficulty: game.difficulty,
     provinceName: game.provinceName,
     cityName: game.cityName,
     stateName: game.stateName,
@@ -132,6 +133,7 @@ async function shareResults() {
       streak: game.bestStreak,
     }),
     t('result.share.mode', { mode: modeName, scope: scopeLabel.value }),
+    game.isHardcore ? t('result.share.hardcore') : '',
   ]
   const text = lines.filter(Boolean).join('\n')
 
@@ -177,6 +179,12 @@ async function shareResults() {
                 class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400"
               >
                 🎯 {{ t('daily.badge', { key: game.dailyKey }) }}
+              </span>
+              <span
+                v-if="game.isHardcore"
+                class="rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-rose-600 dark:text-rose-400"
+              >
+                {{ t('result.hardcoreBadge') }}
               </span>
               <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
                 {{ game.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short') }} · {{ scopeLabel }}
