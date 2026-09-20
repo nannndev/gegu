@@ -3,6 +3,7 @@ import type { RegionCollection, RegionFeature, RegionItem } from '~/types/game'
 import type { MapViewMode } from '~/composables/useMapView'
 import { FLAG_BORDER, flagFillFor } from '~/utils/flagPalette'
 import { scopeProfile } from '~/utils/scopeProfile'
+import { haversineKm } from '~/utils/distance'
 
 export type RegionMark = 'correct' | 'wrong' | 'target'
 
@@ -34,9 +35,31 @@ function needsCountryBackdrop(scope: string) {
  */
 const HIDDEN: PathOptions = { fillOpacity: 0, opacity: 0, weight: 0 }
 
+/**
+ * Wilayah di luar region yang diungkap petunjuk Mode A. Diredupkan, bukan
+ * disembunyikan: yang dibeli pemain adalah penyempitan pencarian, dan itu
+ * hanya terbaca kalau wilayah yang dikesampingkan masih terlihat samar.
+ * Tetap bisa diklik — petunjuk mempersempit tebakan, bukan melarangnya.
+ */
+const DIMMED: PathOptions = { fillOpacity: 0.12, opacity: 0.25 }
+
 interface Options {
-  onRegionClick?: (item: RegionItem) => void
+  /**
+   * `distanceKm` adalah jarak pusat wilayah yang diklik ke pusat target
+   * ronde ini; `undefined` kalau tidak ada target atau salah satu pusatnya
+   * tidak bisa dihitung. Diukur di sini, bukan di pemanggil, karena hanya
+   * layer Leaflet yang tahu geometri tiap wilayah.
+   */
+  onRegionClick?: (item: RegionItem, distanceKm?: number) => void
   onMissClick?: () => void
+  /** Target ronde berjalan; dipakai mengukur jarak tebakan yang meleset. */
+  targetId?: Ref<string | null>
+  /**
+   * Wilayah yang tetap menyala setelah petunjuk Mode A dipakai. Saat set ini
+   * tidak kosong, wilayah di luarnya diredupkan supaya pencarian menyempit
+   * tanpa langsung menunjuk jawabannya.
+   */
+  spotlightIds?: Ref<Set<string> | null>
   scope?: Ref<string>
   worldContext?: Ref<RegionCollection | null>
   /** Backdrop beresolusi lebih tinggi untuk scope yang cuma menutupi sebagian kecil negara. */
@@ -98,6 +121,35 @@ export function useLeafletMap(
   }
 
   /**
+   * Pusat sebuah wilayah, dari bounding box layer-nya.
+   *
+   * Bukan sentroid poligon: negara berbentuk cekung atau berkepulauan bisa
+   * punya sentroid di laut, dan itu tidak lebih benar daripada titik tengah
+   * bbox untuk keperluan di sini — yang diukur adalah "seberapa jauh
+   * melesetnya", bukan koordinat resmi sebuah wilayah.
+   */
+  function centerOf(id: string): { lat: number, lng: number } | null {
+    const layer = layerById.get(id) as unknown as {
+      getBounds?: () => import('leaflet').LatLngBounds
+    } | undefined
+    if (!layer?.getBounds) return null
+    const bounds = layer.getBounds()
+    if (!bounds.isValid()) return null
+    const c = bounds.getCenter()
+    return { lat: c.lat, lng: c.lng }
+  }
+
+  /** Jarak pusat sebuah wilayah ke pusat target ronde ini, km. */
+  function distanceToTarget(id: string): number | undefined {
+    const targetId = options.targetId?.value
+    if (!targetId || targetId === id) return undefined
+    const from = centerOf(id)
+    const to = centerOf(targetId)
+    if (!from || !to) return undefined
+    return haversineKm(from, to)
+  }
+
+  /**
    * Style dasar sebuah wilayah. Scope dunia memakai isian warna bendera
    * (mode tanpa ubin); mode lain memakai tema polos.
    */
@@ -111,10 +163,18 @@ export function useLeafletMap(
     const isLocalMode = isLocalScope(scope.value)
     const isTargetPool = !options.activePoolIds?.value || options.activePoolIds.value.has(item.id)
 
+    // Petunjuk Mode A: wilayah di luar sorotan diredupkan. Dilewati untuk
+    // wilayah yang sudah dijawab, supaya jawaban benar tetap menyala penuh
+    // saat ronde terungkap.
+    const spotlight = options.spotlightIds?.value
+    const dim = !revealed && Boolean(spotlight?.size) && !spotlight!.has(item.id)
+
     if (isLocalMode) {
-      return isTargetPool ? { ...t.activeLocal } : { ...t.contextLocal }
+      const style = isTargetPool ? { ...t.activeLocal } : { ...t.contextLocal }
+      return dim ? { ...style, ...DIMMED } : style
     }
-    if (isCountry) return { ...t.baseId }
+    if (isCountry) return dim ? { ...t.baseId, ...DIMMED } : { ...t.baseId }
+    if (dim) return { ...t.baseWorld, ...DIMMED }
 
     // Warna bendera praktis menyebut nama negaranya, jadi hardcore memakai
     // isian polos meskipun temanya menyediakan bendera.
@@ -241,7 +301,7 @@ export function useLeafletMap(
               options.onMissClick?.()
               return
             }
-            options.onRegionClick?.(item)
+            options.onRegionClick?.(item, distanceToTarget(item.id))
           },
         })
       },
@@ -285,6 +345,18 @@ export function useLeafletMap(
       zoomControl: false,
       attributionControl: false,
       worldCopyJump: profile.country === null,
+      /**
+       * Zoom pecahan.
+       *
+       * Default Leaflet (`zoomSnap: 1`) membulatkan tiap `fitBounds` ke
+       * tingkat zoom bulat terdekat ke bawah. Karena satu tingkat zoom
+       * berarti 2× skala, pembulatan itu bisa menyisakan wilayah soal cuma
+       * mengisi separuh layar — paling parah di cakupan yang bentuknya tidak
+       * sebangun dengan layar, seperti kepulauan Jepang yang memanjang.
+       * Profil cakupan di `scopeProfile` pun sudah menulis minZoom pecahan
+       * (1,8 · 2,5 · 3,5), yang tanpa ini tidak pernah benar-benar berlaku.
+       */
+      zoomSnap: 0.1,
     })
 
     applyCameraLock()
@@ -462,6 +534,22 @@ export function useLeafletMap(
   function invalidate() {
     map?.invalidateSize()
   }
+
+  /**
+   * Sorotan petunjuk berubah: gambar ulang gaya dasar tiap wilayah.
+   *
+   * Cukup `styleFor`, bukan `setupLayers` — layernya tidak berubah, hanya
+   * warnanya, dan membangun ulang layer di tengah ronde akan menghapus
+   * tanda jawaban yang sudah terpasang.
+   */
+  watch(() => options.spotlightIds?.value, () => {
+    if (!ready.value) return
+    for (const [id, layer] of layerById.entries()) {
+      if (marked.has(id)) continue
+      const item = itemById.get(id)
+      if (item) styleFor(layer, baseStyleFor(item))
+    }
+  })
 
   watch([collection, scope, () => options.activePoolIds?.value, () => options.localContext?.value], () => {
     if (ready.value) {

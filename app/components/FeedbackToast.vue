@@ -4,14 +4,30 @@ import { isoToFlag } from '~/utils/geo'
 const emit = defineEmits<{ next: [] }>()
 
 const game = useGameStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const fb = computed(() => game.feedback)
+
+/** Nyaris-kena punya warna sendiri: bukan hijau, tapi juga bukan merah. */
+const tone = computed(() => {
+  const kind = fb.value?.kind
+  if (kind === 'correct') return 'correct'
+  if (kind === 'near') return 'near'
+  return 'wrong'
+})
 
 const headline = computed(() => {
   if (!fb.value) return ''
   if (fb.value.kind === 'correct') return t('feedback.correct', { n: fb.value.points })
+  if (fb.value.kind === 'near') return t('feedback.near', { n: fb.value.points })
   if (fb.value.kind === 'timeout') return t('feedback.timeout')
   return t('feedback.wrong')
+})
+
+/** Jarak meleset, sebagai teks. Kosong kalau tidak terukur (Mode B, timeout). */
+const distanceText = computed(() => {
+  const km = fb.value?.distanceKm
+  if (km === undefined) return ''
+  return formatDistance(km, locale.value)
 })
 
 const isLast = computed(() => game.currentRound >= game.totalRounds)
@@ -37,20 +53,30 @@ onBeforeUnmount(() => {
   <div
     v-if="fb"
     class="flex flex-col justify-between gap-3 rounded-2xl border bg-white/95 dark:bg-slate-900/95 p-4 shadow-2xl shadow-black/10 dark:shadow-black/50 backdrop-blur-md transition-all sm:flex-row sm:items-center"
-    :class="fb.kind === 'correct'
-      ? 'border-emerald-500/40'
-      : 'border-rose-500/40'"
+    :class="{
+      'border-emerald-500/40': tone === 'correct',
+      'border-amber-500/50': tone === 'near',
+      'border-rose-500/40': tone === 'wrong',
+    }"
   >
     <div class="flex items-start gap-3 min-w-0">
       <!-- Status Icon -->
       <div
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm"
-        :class="fb.kind === 'correct'
-          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-          : 'border-rose-500/50 bg-rose-500/15 text-rose-600 dark:text-rose-400'"
+        :class="{
+          'border-emerald-500/50 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400': tone === 'correct',
+          'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400': tone === 'near',
+          'border-rose-500/50 bg-rose-500/15 text-rose-600 dark:text-rose-400': tone === 'wrong',
+        }"
       >
         <svg v-if="fb.kind === 'correct'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <!-- Nyaris: target dengan tanda silang di tengah, bukan centang
+             atau silang — jawabannya salah, tapi tembakannya dekat. -->
+        <svg v-else-if="fb.kind === 'near'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="3.5" />
         </svg>
         <svg v-else-if="fb.kind === 'timeout'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" />
@@ -66,13 +92,35 @@ onBeforeUnmount(() => {
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
           <h3
             class="font-display text-sm font-bold tracking-tight"
-            :class="fb.kind === 'correct' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
+            :class="{
+              'text-emerald-600 dark:text-emerald-400': tone === 'correct',
+              'text-amber-600 dark:text-amber-400': tone === 'near',
+              'text-rose-600 dark:text-rose-400': tone === 'wrong',
+            }"
           >
             {{ headline }}
           </h3>
+
+          <!-- Jarak meleset. Ini yang membuat tebakan dekat terasa berbeda
+               dari tebakan asal, dan satu-satunya cara pemain tahu seberapa
+               dekat tadi. -->
+          <span
+            v-if="distanceText"
+            class="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-400"
+          >
+            {{ t('feedback.distance', { d: distanceText }) }}
+          </span>
+
+          <span
+            v-if="fb.kind !== 'correct' && game.hintUsedThisRound"
+            class="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500 dark:text-slate-400"
+          >
+            {{ t('feedback.hinted') }}
+          </span>
+
           <span
             class="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-semibold"
-            :class="fb.kind === 'correct'
+            :class="tone === 'correct'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
           >
@@ -83,6 +131,14 @@ onBeforeUnmount(() => {
         <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
           <template v-if="fb.kind === 'correct'">
             {{ t('feedback.correctBody', { name: fb.targetName }) }}
+          </template>
+          <template v-else-if="fb.kind === 'near'">
+            <span class="text-slate-500 dark:text-slate-400">
+              {{ t('feedback.youPicked') }} <span class="text-slate-700 dark:text-slate-300">{{ fb.answerName }}</span>.
+            </span>
+            <span>
+              {{ t('feedback.nearBody', { name: fb.targetName }) }}
+            </span>
           </template>
           <template v-else>
             <span v-if="fb.answerName" class="text-slate-500 dark:text-slate-400">

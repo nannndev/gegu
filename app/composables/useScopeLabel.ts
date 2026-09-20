@@ -46,6 +46,21 @@ export function useScopeLabel() {
         state: parts.stateName || t('scope.stateFallback'),
       })
     }
+    if (scope === 'my-states') {
+      return regionFilter === 'all'
+        ? t('scope.myStates')
+        : t('scope.myStatesFiltered', { region: regionFilter })
+    }
+    if (scope === 'jp-prefectures') {
+      return regionFilter === 'all'
+        ? t('scope.jpPrefectures')
+        : t('scope.jpPrefecturesFiltered', { region: regionFilter })
+    }
+    if (scope === 'it-provinces') {
+      return regionFilter === 'all'
+        ? t('scope.itProvinces')
+        : t('scope.itProvincesFiltered', { region: regionFilter })
+    }
     if (scope === 'id-provinces') {
       return regionFilter === 'all'
         ? t('scope.idProvinces')
@@ -75,6 +90,9 @@ export function useScopeLabel() {
     if (scope === 'world') return t('unit.country')
     if (scope === 'us-states') return t('unit.state')
     if (scope === 'us-county') return t('unit.county')
+    if (scope === 'my-states') return t('unit.negeri')
+    if (scope === 'jp-prefectures') return t('unit.prefecture')
+    if (scope === 'it-provinces') return t('unit.provincia')
     if (scope === 'id-provinces') return t('unit.province')
     if (scope === 'id-kabupaten') return t('unit.kabupaten')
     if (scope === 'id-mixed') return t('unit.region')

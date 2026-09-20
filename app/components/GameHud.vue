@@ -71,6 +71,10 @@ onMounted(() => {
       <span class="text-slate-500 dark:text-slate-400 font-mono">{{ game.totalRounds }}</span>
     </div>
 
+    <!-- Deret hasil per ronde; disembunyikan di layar sempit karena HUD
+         di sana sudah penuh oleh skor, ronde, streak, dan timer. -->
+    <RoundTrack class="hidden md:inline-flex" />
+
     <!-- Streak Badge -->
     <Transition name="streak-pop">
       <div
@@ -93,20 +97,16 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <!-- Timer Badge -->
+    <!-- Cincin waktu -->
     <div
       v-if="game.timerEnabled"
-      class="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-mono font-medium shadow-md backdrop-blur-md transition-colors"
-      :class="game.secondsLeft <= 5
-        ? 'border-red-400/50 bg-red-500/15 text-red-600 dark:text-red-400 animate-pulse'
-        : 'border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300'"
+      class="pointer-events-auto inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 px-1 shadow-md backdrop-blur-md"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-      <span class="font-bold">{{ Math.max(0, game.secondsLeft) }}s</span>
+      <TimerRing :seconds-left="game.secondsLeft" :total-seconds="game.roundSeconds" />
     </div>
+
+    <!-- Petunjuk berbayar -->
+    <HintButton />
 
     <!-- Audio Toggle Button -->
     <button

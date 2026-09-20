@@ -11,8 +11,19 @@ const answered = computed(() => game.phase === 'answered')
 
 const hotkeys = ['A', 'B', 'C', 'D']
 
+/** Opsi ini sudah dicoret oleh 50:50? */
+function isEliminated(choice: RegionItem) {
+  return !answered.value && game.eliminatedIds.includes(choice.id)
+}
+
 function choiceClass(choice: RegionItem) {
   if (!answered.value) {
+    // Opsi yang dicoret tetap di tempatnya, tidak dihapus dari daftar:
+    // memindahkan tombol setelah pemain sudah mengarahkan kursor ke salah
+    // satunya membuat petunjuk terasa seperti gangguan, bukan bantuan.
+    if (isEliminated(choice)) {
+      return 'border-slate-200/50 dark:border-white/5 bg-slate-100/40 dark:bg-slate-950/40 text-slate-400 dark:text-slate-600 line-through opacity-45'
+    }
     return 'border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-100 hover:border-sky-500/60 hover:bg-sky-50/50 dark:hover:bg-slate-800 shadow-sm'
   }
   if (choice.id === game.currentTarget?.id) {
@@ -39,7 +50,9 @@ function handleKeyDown(e: KeyboardEvent) {
 
   if (selectedIndex >= 0 && selectedIndex < game.choices.length) {
     const item = game.choices[selectedIndex]
-    if (item) emit('answer', item)
+    // Opsi yang sudah dicoret ditolak juga lewat papan ketik: kalau tidak,
+    // menekan tombolnya masih menjawab sesuatu yang layarnya bilang mati.
+    if (item && !isEliminated(item)) emit('answer', item)
   }
 }
 
@@ -57,6 +70,9 @@ const challengeBadge = computed(() => {
   if (game.datasetScope === 'id-provinces') return t('prompt.badge.provinces')
   if (game.datasetScope === 'world') return t('scope.world')
   if (game.datasetScope === 'us-states') return t('prompt.badge.usStates')
+  if (game.datasetScope === 'my-states') return t('prompt.badge.myStates')
+  if (game.datasetScope === 'jp-prefectures') return t('prompt.badge.jpPrefectures')
+  if (game.datasetScope === 'it-provinces') return t('prompt.badge.itProvinces')
   return formatScope({
     scope: game.datasetScope,
     provinceName: game.provinceName,
@@ -66,30 +82,88 @@ const challengeBadge = computed(() => {
   })
 })
 
+/**
+ * Cakupan yang menentukan bunyi pertanyaan.
+ *
+ * Di mode campuran ini bukan `datasetScope` — scope-nya `id-mixed` sepanjang
+ * sesi, sementara levelnya berganti tiap ronde. Membaca scope saja membuat
+ * soal kecamatan ditanya sebagai "negara mana", karena `id-mixed` jatuh ke
+ * cabang terakhir yang kebetulan milik peta dunia. Yang benar adalah level
+ * target ronde berjalan, sama seperti yang sudah dipakai `MapView` untuk
+ * memilih koleksi yang digambar.
+ */
+const promptScope = computed(() => {
+  if (game.datasetScope !== 'id-mixed') return game.datasetScope
+  const level = game.currentTarget?.level
+  if (level === 'district') return 'id-kecamatan'
+  if (level === 'country') return 'id-kabupaten'
+  return 'id-provinces'
+})
+
+/**
+ * Bendera di sebelah nama wilayah.
+ *
+ * Diturunkan dari scope, bukan ditulis `🇮🇩` untuk semua yang bukan dunia:
+ * begitu ada negara ketiga, cabang "selain dunia berarti Indonesia" mulai
+ * memasang bendera yang salah.
+ */
+/** Warna titik berdenyut di bilah soal, mengikuti negara cakupannya. */
+const scopeDotClass = computed(() => {
+  if (game.isHardcore) return 'bg-rose-600'
+  if (game.datasetScope === 'world') return 'bg-sky-500'
+  if (game.datasetScope.startsWith('us')) return 'bg-blue-500'
+  if (game.datasetScope.startsWith('my')) return 'bg-amber-500'
+  if (game.datasetScope.startsWith('jp')) return 'bg-rose-400'
+  if (game.datasetScope.startsWith('it')) return 'bg-emerald-500'
+  return 'bg-rose-500'
+})
+
+const promptFlag = computed(() => {
+  if (game.isHardcore) return '☠️'
+  if (game.datasetScope === 'world') {
+    return isoToFlag(game.currentTarget?.iso) || '🌐'
+  }
+  if (game.datasetScope.startsWith('us')) return '🇺🇸'
+  if (game.datasetScope.startsWith('my')) return '🇲🇾'
+  if (game.datasetScope.startsWith('jp')) return '🇯🇵'
+  if (game.datasetScope.startsWith('it')) return '🇮🇹'
+  return '🇮🇩'
+})
+
 const modeAInstruction = computed(() => {
   const name = game.currentTarget?.name ?? ''
-  if (game.datasetScope === 'id-kecamatan') return t('prompt.a.kecamatan', { name })
-  if (game.datasetScope === 'id-kabupaten') return t('prompt.a.kabupaten', { name })
-  if (game.datasetScope === 'id-provinces') return t('prompt.a.provinces')
-  if (game.datasetScope === 'us-states') return t('prompt.a.usStates', { name })
-  if (game.datasetScope === 'us-county') return t('prompt.a.usCounty', { name })
+  if (promptScope.value === 'id-kecamatan') return t('prompt.a.kecamatan', { name })
+  if (promptScope.value === 'id-kabupaten') return t('prompt.a.kabupaten', { name })
+  if (promptScope.value === 'id-provinces') return t('prompt.a.provinces')
+  if (promptScope.value === 'us-states') return t('prompt.a.usStates', { name })
+  if (promptScope.value === 'us-county') return t('prompt.a.usCounty', { name })
+  if (promptScope.value === 'my-states') return t('prompt.a.myStates', { name })
+  if (promptScope.value === 'jp-prefectures') return t('prompt.a.jpPrefectures', { name })
+  if (promptScope.value === 'it-provinces') return t('prompt.a.itProvinces', { name })
   return t('prompt.a.world')
 })
 
 const modeBQuestion = computed(() => {
-  if (game.datasetScope === 'id-kecamatan') {
+  if (promptScope.value === 'id-kecamatan') {
+    // Mode campuran menarik kecamatan dari beberapa kota acak, jadi tidak ada
+    // satu "kota ini" yang benar — pertanyaannya dibiarkan tanpa penyebutan kota.
+    if (game.datasetScope === 'id-mixed') return t('prompt.b.kecamatanMixed')
     return t('prompt.b.kecamatan', {
       city: shortCity(game.cityName) || t('prompt.b.cityFallback'),
     })
   }
-  if (game.datasetScope === 'id-kabupaten') {
+  if (promptScope.value === 'id-kabupaten') {
+    if (game.datasetScope === 'id-mixed') return t('prompt.b.kabupatenMixed')
     return t('prompt.b.kabupaten', {
       province: game.provinceName || t('prompt.b.provinceFallback'),
     })
   }
-  if (game.datasetScope === 'id-provinces') return t('prompt.b.provinces')
-  if (game.datasetScope === 'us-states') return t('prompt.b.usStates')
-  if (game.datasetScope === 'us-county') {
+  if (promptScope.value === 'id-provinces') return t('prompt.b.provinces')
+  if (promptScope.value === 'us-states') return t('prompt.b.usStates')
+  if (promptScope.value === 'my-states') return t('prompt.b.myStates')
+  if (promptScope.value === 'jp-prefectures') return t('prompt.b.jpPrefectures')
+  if (promptScope.value === 'it-provinces') return t('prompt.b.itProvinces')
+  if (promptScope.value === 'us-county') {
     return t('prompt.b.usCounty', {
       state: game.stateName || t('prompt.b.stateFallback'),
     })
@@ -106,7 +180,7 @@ const modeBQuestion = computed(() => {
         <div class="flex items-center gap-2">
           <span
             class="inline-flex h-2 w-2 rounded-full animate-pulse"
-            :class="game.isHardcore ? 'bg-rose-600' : game.datasetScope === 'world' ? 'bg-sky-500' : game.datasetScope.startsWith('us') ? 'bg-blue-500' : 'bg-rose-500'"
+            :class="scopeDotClass"
           />
           <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ challengeBadge }}
@@ -117,11 +191,17 @@ const modeBQuestion = computed(() => {
           <!-- Chip benua/provinsi mempersempit peta drastis, jadi hardcore memakainya sebagai tanda tanya. -->
           <span
             v-if="game.currentTarget"
-            class="rounded-md border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
+            class="rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors"
+            :class="game.revealedRegion === game.currentTarget.region
+              ? 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+              : 'border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
           >
             {{ game.isHardcore ? t('prompt.badge.hidden') : game.currentTarget.region }}
           </span>
-          <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
+          <span
+            class="font-mono text-[11px] font-bold"
+            :class="game.hintUsedThisRound ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400'"
+          >
             {{ t('prompt.points', { n: game.nextPoints }) }}
           </span>
         </div>
@@ -132,7 +212,7 @@ const modeBQuestion = computed(() => {
           <div class="flex items-center gap-2.5">
             <!-- Bendera langsung menyebut negaranya; hardcore memakai tengkorak. -->
             <span class="text-2xl select-none" aria-hidden="true">
-              {{ game.isHardcore ? '☠️' : game.datasetScope === 'world' ? (isoToFlag(game.currentTarget?.iso) || '🌐') : '🇮🇩' }}
+              {{ promptFlag }}
             </span>
             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white drop-shadow-sm">
               {{ game.currentTarget?.name }}
@@ -154,7 +234,10 @@ const modeBQuestion = computed(() => {
             {{ challengeBadge }}
           </span>
         </div>
-        <span class="font-mono text-[11px] font-bold text-sky-600 dark:text-sky-400">
+        <span
+          class="font-mono text-[11px] font-bold"
+          :class="game.hintUsedThisRound ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400'"
+        >
           {{ t('prompt.points', { n: game.nextPoints }) }}
         </span>
       </div>
@@ -168,7 +251,7 @@ const modeBQuestion = computed(() => {
           v-for="(choice, index) in game.choices"
           :key="choice.id"
           type="button"
-          :disabled="answered"
+          :disabled="answered || isEliminated(choice)"
           class="group flex min-h-11 items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition-all disabled:cursor-default active:scale-98"
           :class="choiceClass(choice)"
           @click="emit('answer', choice)"

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { isoToFlag, getPerformanceRank } from '~/utils/geo'
+import { formatDistance } from '~/utils/distance'
 
 const game = useGameStore()
 const { playFanfare, playClick } = useAudio()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { formatScope } = useScopeLabel()
 
 if (!game.history.length) await navigateTo('/')
@@ -77,6 +78,18 @@ function playAgain() {
   navigateTo({ path: '/play', query: { mode } })
 }
 
+/**
+ * Ulangi hanya wilayah yang tadi salah.
+ *
+ * Ini bagian yang benar-benar melatih: mengulang sesi penuh berarti
+ * menghabiskan sebagian besar ronde pada wilayah yang sudah hafal.
+ */
+function drillMisses() {
+  playClick()
+  if (!game.startDrill()) return
+  navigateTo({ path: '/play', query: { mode: game.mode } })
+}
+
 function toHome() {
   playClick()
   game.resetGame()
@@ -106,8 +119,24 @@ const columnHeader = computed(() => {
   if (game.datasetScope === 'id-mixed') return t('unit.region')
   if (game.datasetScope === 'us-states') return t('unit.state')
   if (game.datasetScope === 'us-county') return t('unit.county')
+  if (game.datasetScope === 'my-states') return t('unit.negeri')
+  if (game.datasetScope === 'jp-prefectures') return t('unit.prefecture')
+  if (game.datasetScope === 'it-provinces') return t('unit.provincia')
   return t('unit.country')
 })
+
+/**
+ * Bendera di kolom nama. Sama seperti di bilah soal, diturunkan dari scope
+ * supaya negara ketiga tidak mewarisi bendera Indonesia.
+ */
+function rowFlag(iso?: string | null) {
+  if (game.datasetScope === 'world') return isoToFlag(iso) || '🌐'
+  if (game.datasetScope.startsWith('us')) return '🇺🇸'
+  if (game.datasetScope.startsWith('my')) return '🇲🇾'
+  if (game.datasetScope.startsWith('jp')) return '🇯🇵'
+  if (game.datasetScope.startsWith('it')) return '🇮🇹'
+  return '🇮🇩'
+}
 
 /**
  * Ringkasan ronde sebagai deret emoji, biar hasil yang disalin langsung
@@ -271,11 +300,12 @@ async function shareResults() {
                   {{ row.round }}
                 </td>
                 <td class="px-4 py-2.5 font-semibold text-slate-900 dark:text-white">
-                  <span class="mr-1.5">{{ game.datasetScope === 'world' ? (isoToFlag(row.targetIso) || '🌐') : '🇮🇩' }}</span>
+                  <span class="mr-1.5">{{ rowFlag(row.targetIso) }}</span>
                   <span>{{ row.targetName }}</span>
                   <span v-if="!row.correct && row.answerName" class="ml-1.5 text-[11px] font-normal text-rose-600 dark:text-rose-400">
                     {{ t('result.table.picked', { name: row.answerName }) }}
                   </span>
+                  <span v-if="row.usedHint" class="ml-1.5 text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="t('feedback.hinted')">💡</span>
                 </td>
                 <td class="px-4 py-2.5">
                   <span
@@ -284,11 +314,25 @@ async function shareResults() {
                   >
                     ✓ {{ t('common.correct') }}
                   </span>
+                  <!-- Nyaris-kena: badge sendiri dengan jaraknya, supaya
+                       baris berpoin tidak terbaca sebagai salah total. -->
+                  <span
+                    v-else-if="row.pointsEarned > 0"
+                    class="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400"
+                  >
+                    ◎ {{ t('common.near') }}
+                    <span v-if="row.distanceKm !== undefined" class="font-mono normal-case opacity-80">
+                      {{ formatDistance(row.distanceKm, locale) }}
+                    </span>
+                  </span>
                   <span
                     v-else
-                    class="inline-flex items-center rounded border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400"
+                    class="inline-flex items-center gap-1 rounded border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400"
                   >
                     ✗ {{ t('common.wrong') }}
+                    <span v-if="row.distanceKm !== undefined" class="font-mono normal-case opacity-80">
+                      {{ formatDistance(row.distanceKm, locale) }}
+                    </span>
                   </span>
                 </td>
                 <td class="px-4 py-2.5 text-right font-mono font-bold" :class="row.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'">
@@ -308,6 +352,24 @@ async function shareResults() {
           @click="playAgain"
         >
           {{ t('result.playAgain') }}
+        </button>
+
+        <!--
+          Latihan hanya muncul kalau ada yang salah — sesi sempurna tidak
+          punya apa pun untuk diulang, dan tombol mati di sana cuma jadi
+          pertanyaan.
+        -->
+        <button
+          v-if="game.missedItems.length"
+          type="button"
+          class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 text-xs font-bold text-amber-700 dark:text-amber-300 transition hover:bg-amber-500/25 active:scale-95 sm:w-auto"
+          @click="drillMisses"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 2v6h6" />
+            <path d="M3 13a9 9 0 1 0 3-7.7L3 8" />
+          </svg>
+          {{ t('result.drill', { n: game.missedItems.length }) }}
         </button>
 
         <button

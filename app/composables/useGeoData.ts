@@ -58,6 +58,30 @@ interface KecamatanIndex {
   cities: KecamatanCity[]
 }
 
+/**
+ * Level data tiap cakupan.
+ *
+ * Satu tabel, bukan rantai ternary yang diulang di dua tempat: tiap negara
+ * baru dulu berarti menambah `|| scope === '…'` di kedua rantai itu, dan
+ * melewatkan salah satunya membuat dataset dimuat sebagai level yang salah.
+ */
+const LEVEL_BY_SCOPE: Record<DatasetScope, RegionLevel> = {
+  'world': 'world',
+  'id-provinces': 'province',
+  'id-kabupaten': 'province',
+  'id-kecamatan': 'district',
+  'id-mixed': 'world',
+  'us-states': 'province',
+  'us-county': 'district',
+  'my-states': 'province',
+  'jp-prefectures': 'province',
+  'it-provinces': 'province',
+}
+
+function levelFor(scope: DatasetScope): RegionLevel {
+  return LEVEL_BY_SCOPE[scope] ?? 'world'
+}
+
 /** Cache per-set supaya GeoJSON hanya di-parse sekali per sesi. */
 const cache = new Map<string, RegionCollection>()
 
@@ -98,6 +122,15 @@ async function loadRegionSet(
   let data: RegionCollection
   if (code === 'us-states') {
     data = (await import('~/assets/data/us-states.geo.json')).default as unknown as RegionCollection
+  }
+  else if (code === 'my-states') {
+    data = (await import('~/assets/data/my-states.geo.json')).default as unknown as RegionCollection
+  }
+  else if (code === 'jp-prefectures') {
+    data = (await import('~/assets/data/jp-prefectures.geo.json')).default as unknown as RegionCollection
+  }
+  else if (code === 'it-provinces') {
+    data = (await import('~/assets/data/it-provinces.geo.json')).default as unknown as RegionCollection
   }
   else if (code === 'id-kabupaten') {
     data = (await import('~/assets/data/indonesia-kabupaten.geo.json')).default as unknown as RegionCollection
@@ -215,13 +248,7 @@ export function useGeoData() {
 
   async function load(level?: RegionLevel, code?: DatasetScope, force = false, cityOrStateId?: string) {
     const targetScope = code ?? currentScope.value ?? 'world'
-    const targetLevel = level ?? (
-      targetScope === 'id-kecamatan' || targetScope === 'us-county'
-        ? 'district'
-        : targetScope === 'id-kabupaten' || targetScope === 'id-provinces' || targetScope === 'us-states'
-          ? 'province'
-          : 'world'
-    )
+    const targetLevel = level ?? levelFor(targetScope)
 
     const targetCity = targetScope === 'id-kecamatan'
       ? cityOrStateId ?? kecamatanCityId.value ?? defaultCityId(await loadKecamatanIndex())
@@ -277,12 +304,7 @@ export function useGeoData() {
 
   async function setScope(scope: DatasetScope) {
     if (currentScope.value === scope && collection.value) return
-    const level: RegionLevel = (scope === 'id-kecamatan' || scope === 'us-county')
-      ? 'district'
-      : (scope === 'id-kabupaten' || scope === 'id-provinces' || scope === 'us-states')
-        ? 'province'
-        : 'world'
-    await load(level, scope, true)
+    await load(levelFor(scope), scope, true)
   }
 
   /** Ganti kabupaten/kota di mode kecamatan. */

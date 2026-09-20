@@ -125,6 +125,21 @@ body {
   background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, rgba(239, 68, 68, 0.05) 45%, transparent 75%);
 }
 
+/* Malaysia: kuning–merah tua, mengikuti Jalur Gemilang. */
+.bg-ambient-malaysia {
+  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.16) 0%, rgba(220, 38, 38, 0.06) 45%, transparent 75%);
+}
+
+/* Italia: hijau–merah Tricolore. */
+.bg-ambient-italy {
+  background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.14) 0%, rgba(220, 38, 38, 0.05) 45%, transparent 75%);
+}
+
+/* Jepang: merah Hinomaru di atas putih. */
+.bg-ambient-japan {
+  background: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.14) 0%, rgba(244, 63, 94, 0.05) 45%, transparent 75%);
+}
+
 .dark .bg-ambient-glow {
   background: radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.18) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%);
 }
@@ -135,6 +150,18 @@ body {
 
 .dark .bg-ambient-us {
   background: radial-gradient(circle at 50% -10%, rgba(59, 130, 246, 0.18) 0%, rgba(239, 68, 68, 0.08) 40%, transparent 70%);
+}
+
+.dark .bg-ambient-malaysia {
+  background: radial-gradient(circle at 50% -10%, rgba(245, 158, 11, 0.18) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 70%);
+}
+
+.dark .bg-ambient-italy {
+  background: radial-gradient(circle at 50% -10%, rgba(16, 185, 129, 0.17) 0%, rgba(220, 38, 38, 0.07) 40%, transparent 70%);
+}
+
+.dark .bg-ambient-japan {
+  background: radial-gradient(circle at 50% -10%, rgba(225, 29, 72, 0.17) 0%, rgba(244, 63, 94, 0.07) 40%, transparent 70%);
 }
 
 /*
@@ -503,6 +530,34 @@ body {
   animation: hud-score-bump 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/*
+ * Cincin waktu. Busurnya dianimasikan lewat `stroke-dashoffset` supaya
+ * penyusutannya mulus di antara detak timer yang hanya sekali per detik —
+ * tanpa transisi, cincin ini akan melompat sekali sedetik seperti angka.
+ */
+.timer-ring-arc {
+  transition: stroke-dashoffset 1s linear, color 0.3s ease;
+}
+
+@keyframes timer-ring-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.timer-ring-critical {
+  animation: timer-ring-pulse 1s ease-in-out infinite;
+}
+
+/* Petak ronde yang sedang berjalan. */
+@keyframes round-track-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.round-track-active {
+  animation: round-track-breathe 1.6s ease-in-out infinite;
+}
+
 /* Streak badge pop — dipakai <Transition name="streak-pop"> di GameHud. */
 .streak-pop-enter-active {
   transition: opacity 0.2s ease-out, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -524,8 +579,19 @@ body {
   .card-pop-leave-active,
   .streak-pop-enter-active,
   .streak-pop-leave-active,
+  .timer-ring-critical,
+  .round-track-active,
   .hud-score.hud-score-bumping .hud-score-value {
     animation: none !important;
+    transition: none !important;
+  }
+
+  /*
+   * Cincin waktu tetap ikut menyusut, hanya tanpa interpolasi: menghapus
+   * transisinya membuat busur melompat per detik, tapi membekukannya akan
+   * menghapus satu-satunya penanda waktu yang tersisa di layar.
+   */
+  .timer-ring-arc {
     transition: none !important;
   }
 }

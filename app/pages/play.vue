@@ -4,7 +4,7 @@ import { scopeProfile } from '~/utils/scopeProfile'
 
 const game = useGameStore()
 const { load } = useGeoData()
-const { playCorrect, playWrong, playTick } = useAudio()
+const { playCorrect, playNear, playWrong, playTick } = useAudio()
 const { t } = useI18n()
 
 const mapRef = ref<{
@@ -13,7 +13,14 @@ const mapRef = ref<{
   fitRegion: (id: string) => void
   fitPool: (items: RegionItem[]) => void
   fitSameLevel: (target: RegionItem) => void
-  roundReady?: { value: boolean }
+  /**
+   * Boolean polos, bukan ref: Vue membungkus objek `defineExpose` dengan
+   * `proxyRefs()`, yang membuka ref apa pun di dalamnya. Mengetiknya sebagai
+   * `{ value: boolean }` membuat `roundReady?.value` selalu `undefined` —
+   * penjaga di `renderRound` tidak pernah menyala dan mode campuran
+   * menggambar sebelum layernya siap.
+   */
+  roundReady?: boolean
   resetView: () => void
   setInteractive: (v: boolean) => void
 } | null>(null)
@@ -36,6 +43,7 @@ if (targetScope !== 'id-mixed') {
 
 const mapReady = ref(false)
 const showExitModal = ref(false)
+const showShortcuts = ref(false)
 
 /** Re-render map according to current round */
 async function renderRound() {
@@ -44,7 +52,7 @@ async function renderRound() {
   if (!map || !mapReady.value || !target) return
   // Mode campuran memuat koleksinya per ronde; menggambar sebelum layer-nya
   // siap membuat wilayah soal tidak tersorot dan tidak bisa diklik.
-  if (map.roundReady?.value === false) return
+  if (map.roundReady === false) return
 
   map.resetStyles()
 
@@ -74,7 +82,7 @@ async function renderRound() {
 }
 
 watch(
-  [() => game.currentRound, mapReady, () => mapRef.value?.roundReady?.value],
+  [() => game.currentRound, mapReady, () => mapRef.value?.roundReady],
   renderRound,
   { immediate: true },
 )
@@ -84,9 +92,9 @@ function onMapReady() {
 }
 
 /** Mode A: clicked country polygon */
-function onPick(item: RegionItem) {
+function onPick(item: RegionItem, distanceKm?: number) {
   if (game.mode !== 'A' || game.phase !== 'playing') return
-  answer(item)
+  answer(item, distanceKm)
 }
 
 /** Mode A: clicked in ocean / outside any polygon */
@@ -97,12 +105,14 @@ function onMiss() {
 
 /** Mode B: multiple choice selected */
 function onChoice(item: RegionItem) {
+  // Tanpa jarak: Mode B menjawab dari daftar nama, tidak dari titik di peta,
+  // jadi "seberapa dekat" tidak punya arti di sini.
   if (game.mode !== 'B' || game.phase !== 'playing') return
   answer(item)
 }
 
-function answer(item: RegionItem | null) {
-  game.submitAnswer(item?.id ?? null, item?.name ?? null)
+function answer(item: RegionItem | null, distanceKm?: number) {
+  game.submitAnswer(item?.id ?? null, item?.name ?? null, distanceKm)
 
   const map = mapRef.value
   const target = game.currentTarget
@@ -110,13 +120,14 @@ function answer(item: RegionItem | null) {
 
   map.setInteractive(false)
 
-  // Sound feedback
-  if (item && item.id === target.id) {
-    playCorrect()
-  }
-  else {
-    playWrong()
-  }
+  // Bunyinya dibaca dari `feedback.kind`, bukan dihitung ulang di sini:
+  // store yang memutuskan sebuah tebakan masuk hitungan "nyaris" atau tidak,
+  // dan menduplikasi ambangnya di sini akan membuat suara dan kartu umpan
+  // balik bisa berbeda pendapat.
+  const kind = game.feedback?.kind
+  if (kind === 'correct') playCorrect()
+  else if (kind === 'near') playNear()
+  else playWrong()
 
   if (item && item.id !== target.id) map.mark(item.id, 'wrong')
   map.mark(target.id, 'correct')
@@ -155,7 +166,18 @@ onBeforeUnmount(() => {
 
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    // Esc menutup lembar pintasan lebih dulu kalau sedang terbuka —
+    // menariknya keluar dari sesi sekaligus jelas bukan yang dimaksud.
+    if (showShortcuts.value) {
+      showShortcuts.value = false
+      return
+    }
     showExitModal.value = !showExitModal.value
+    return
+  }
+  if (e.key === '?') {
+    e.preventDefault()
+    showShortcuts.value = !showShortcuts.value
   }
 }
 
@@ -185,20 +207,35 @@ function confirmQuit() {
     <div class="pointer-events-none absolute inset-x-0 top-0 z-[1100] flex items-start justify-between gap-3 p-3 sm:p-4">
       <GameHud />
 
-      <button
-        type="button"
-        class="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-sm backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
-        @click="showExitModal = true"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-        <span>{{ t('play.quit') }}</span>
-        <span class="shadcn-kbd text-[10px] hidden sm:inline-flex">
-          Esc
-        </span>
-      </button>
+      <div class="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          class="focusable pointer-events-auto hidden h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 shadow-sm backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white active:scale-95 sm:inline-flex"
+          :title="t('shortcut.title')"
+          :aria-label="t('shortcut.title')"
+          @click="showShortcuts = true"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-sm backdrop-blur-md transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+          @click="showExitModal = true"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          <span>{{ t('play.quit') }}</span>
+          <span class="shadcn-kbd text-[10px] hidden sm:inline-flex">
+            Esc
+          </span>
+        </button>
+      </div>
     </div>
 
     <!-- Bottom Action Card -->
@@ -215,6 +252,8 @@ function confirmQuit() {
         </Transition>
       </div>
     </div>
+
+    <ShortcutSheet v-model="showShortcuts" />
 
     <!-- Exit Confirmation Modal -->
     <Transition

@@ -28,6 +28,16 @@ export interface ScopeProfile {
   /** Batas zoom saat memfokus satu wilayah (Mode B) dan saat fit ke pool. */
   fitRegionMaxZoom: number
   fitPoolMaxZoom: number
+  /**
+   * Radius poin nyaris-kena, dalam kilometer: sejauh mana tebakan Mode A
+   * masih dianggap "hampir" dan dibayar sebagian.
+   *
+   * Nilainya harus sekelas jarak antar wilayah tetangga di cakupan itu,
+   * bukan satu angka global. 200 km di peta dunia berarti negara sebelah;
+   * di peta kecamatan Jakarta itu menjangkau seluruh Jawa Barat, jadi
+   * mengklik asal di mana pun selalu dibayar.
+   */
+  nearMissKm: number
 }
 
 const WORLD: ScopeProfile = {
@@ -40,6 +50,8 @@ const WORLD: ScopeProfile = {
   countryBackdrop: false,
   fitRegionMaxZoom: 5,
   fitPoolMaxZoom: 12,
+  // Sekelas "negara tetangga di benua yang sama".
+  nearMissKm: 1500,
 }
 
 /** Kamera default Indonesia: seluruh kepulauan terlihat pada zoom 5. */
@@ -52,6 +64,23 @@ const ID_BASE = { country: 'Indonesia', center: [-2.2, 118] as [number, number],
  */
 const US_BASE = { country: 'United States of America', center: [39.5, -98] as [number, number], zoom: 4, minZoom: 2.5 }
 
+/**
+ * Kamera default Malaysia. Semenanjung dan Borneo terpisah ±600 km Laut China
+ * Selatan, jadi pusatnya diletakkan di laut di antara keduanya — memusatkan ke
+ * salah satu daratan membuat separuh negaranya keluar layar pada zoom awal.
+ */
+const MY_BASE = { country: 'Malaysia', center: [3.5, 109.5] as [number, number], zoom: 5, minZoom: 4 }
+
+/**
+ * Kamera default Jepang. Kepulauannya memanjang ±3.000 km dari Hokkaido ke
+ * Okinawa, jadi seperti Malaysia kameranya difit ke isi koleksi (`local`),
+ * bukan dipasang tetap — nilai ini cuma jadi titik awal sebelum fit.
+ */
+const JP_BASE = { country: 'Japan', center: [37.5, 138] as [number, number], zoom: 5, minZoom: 3.5 }
+
+/** Kamera default Italia: seluruh semenanjung plus Sisilia & Sardinia. */
+const IT_BASE = { country: 'Italy', center: [42.5, 12.5] as [number, number], zoom: 5, minZoom: 4 }
+
 const PROFILES: Record<DatasetScope, ScopeProfile> = {
   'world': WORLD,
 
@@ -62,6 +91,8 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     countryBackdrop: false,
     fitRegionMaxZoom: 8,
     fitPoolMaxZoom: 12,
+    // Provinsi tetangga di pulau yang sama.
+    nearMissKm: 400,
   },
   'id-kabupaten': {
     ...ID_BASE,
@@ -70,6 +101,7 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     countryBackdrop: false,
     fitRegionMaxZoom: 12,
     fitPoolMaxZoom: 12,
+    nearMissKm: 120,
   },
   'id-kecamatan': {
     ...ID_BASE,
@@ -80,6 +112,8 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     countryBackdrop: true,
     fitRegionMaxZoom: 14,
     fitPoolMaxZoom: 13,
+    // Kecamatan sebelah; di kota padat jaraknya cuma beberapa kilometer.
+    nearMissKm: 15,
   },
   'id-mixed': {
     ...ID_BASE,
@@ -88,6 +122,8 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     countryBackdrop: false,
     fitRegionMaxZoom: 12,
     fitPoolMaxZoom: 12,
+    // Pool-nya lintas tingkat, jadi radiusnya diambil di tengah-tengah.
+    nearMissKm: 150,
   },
 
   'us-states': {
@@ -97,6 +133,8 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     countryBackdrop: false,
     fitRegionMaxZoom: 7,
     fitPoolMaxZoom: 10,
+    // State tetangga; AS jauh lebih lebar daripada Jawa.
+    nearMissKm: 700,
   },
   'us-county': {
     ...US_BASE,
@@ -107,6 +145,69 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
     // zoom maksimumnya lebih rendah.
     fitRegionMaxZoom: 11,
     fitPoolMaxZoom: 11,
+    // County tetangga; ukurannya jauh lebih besar daripada kecamatan.
+    nearMissKm: 90,
+  },
+
+  'my-states': {
+    ...MY_BASE,
+    maxZoom: 10,
+    /**
+     * `local`, tidak seperti provinsi Indonesia atau state AS.
+     *
+     * Bukan karena cakupannya sebagian negara — pool ini justru seluruh
+     * Malaysia — tapi karena bentuk negaranya: Semenanjung dan Borneo
+     * terpisah ±600 km laut, jadi kotak pembatasnya jauh lebih lebar
+     * daripada daratannya. Zoom tetap dari `MY_BASE` menyisakan laut di
+     * kiri-kanan dan membuat negerinya mengecil sampai bentuknya tidak
+     * terbaca; `fitCollection` memasang kamera ke isi sebenarnya.
+     */
+    local: true,
+    // Peta negeri terlalu sepi tanpa daratan sekitar: Thailand, Indonesia,
+    // dan Brunei yang mengapitnya justru patokan posisi utama di sini.
+    countryBackdrop: true,
+    fitRegionMaxZoom: 7,
+    fitPoolMaxZoom: 10,
+    // Negeri tetangga di Semenanjung; skalanya mirip provinsi Indonesia,
+    // jauh lebih kecil daripada state AS.
+    nearMissKm: 250,
+  },
+
+  'jp-prefectures': {
+    ...JP_BASE,
+    maxZoom: 10,
+    // Alasan sama dengan Malaysia: kepulauan memanjang membuat kotak
+    // pembatasnya jauh lebih besar daripada daratannya, jadi zoom tetap
+    // menyisakan laut kosong dan mengecilkan prefekturnya.
+    local: true,
+    // Korea dan pesisir Asia jadi patokan posisi; tanpa itu kepulauannya
+    // mengambang di laut kosong.
+    countryBackdrop: true,
+    fitRegionMaxZoom: 8,
+    fitPoolMaxZoom: 10,
+    /**
+     * Jarak antar prefektur bertetangga: median 65 km, terdekat 45 km.
+     * 150 km berarti kira-kira "satu sampai dua prefektur meleset" — lebih
+     * ketat daripada provinsi Indonesia karena prefektur jauh lebih rapat.
+     */
+    nearMissKm: 150,
+  },
+
+  'it-provinces': {
+    ...IT_BASE,
+    maxZoom: 11,
+    // Semenanjung memanjang plus dua pulau besar; sama seperti Jepang,
+    // kamera difit ke isi koleksi, bukan dipasang tetap.
+    local: true,
+    // Alpen dan Laut Tengah jadi patokan; tanpa itu Italia mengambang.
+    countryBackdrop: true,
+    fitRegionMaxZoom: 9,
+    fitPoolMaxZoom: 11,
+    /**
+     * Provinsi Italia rapat: median jarak antar tetangga 39 km, terdekat
+     * 9 km. 90 km berarti kira-kira "satu sampai dua provinsi meleset".
+     */
+    nearMissKm: 90,
   },
 }
 

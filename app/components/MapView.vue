@@ -3,7 +3,7 @@ import type { RegionCollection, RegionItem } from '~/types/game'
 import type { RegionMark } from '~/composables/useLeafletMap'
 
 const emit = defineEmits<{
-  pick: [item: RegionItem]
+  pick: [item: RegionItem, distanceKm?: number]
   miss: []
   ready: []
 }>()
@@ -102,8 +102,14 @@ const soloTargetId = computed(() =>
   hardcore.value && game.mode === 'B' ? game.currentTarget?.id ?? null : null,
 )
 
+const targetId = computed(() => game.currentTarget?.id ?? null)
+/** Sorotan petunjuk; hanya Mode A yang mengisinya. */
+const spotlightIds = computed(() =>
+  game.spotlightIds.length ? new Set(game.spotlightIds) : null,
+)
+
 const map = useLeafletMap(container, activeCollection, {
-  onRegionClick: item => emit('pick', item),
+  onRegionClick: (item, distanceKm) => emit('pick', item, distanceKm),
   onMissClick: () => emit('miss'),
   scope,
   worldContext,
@@ -113,6 +119,8 @@ const map = useLeafletMap(container, activeCollection, {
   isDark,
   hardcore,
   soloTargetId,
+  targetId,
+  spotlightIds,
 })
 
 const canvasColor = computed(() => mapTheme(viewMode.value, isDark.value).canvas)

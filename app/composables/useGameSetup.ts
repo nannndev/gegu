@@ -2,7 +2,10 @@ import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { DatasetScope, Difficulty, GameMode, RegionItem, RegionLevel } from '~/types/game'
 import { HARDCORE_SECONDS, ROUND_SECONDS } from '~/stores/game'
 
-export type PrimaryScope = 'world' | 'indonesia' | 'us'
+export type PrimaryScope = 'world' | 'indonesia' | 'us' | 'malaysia' | 'japan' | 'italy'
+
+/** Nilai `PrimaryScope` yang sah; dipakai saat memulihkan setup tersimpan. */
+const PRIMARY_SCOPES: PrimaryScope[] = ['world', 'indonesia', 'us', 'malaysia', 'japan', 'italy']
 export type IndonesiaLevel = 'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'
 export type UsLevel = 'states' | 'county'
 
@@ -63,6 +66,9 @@ export function useGameSetup() {
 
   const activeScope = computed<DatasetScope>(() => {
     if (primaryScope.value === 'world') return 'world'
+    if (primaryScope.value === 'malaysia') return 'my-states'
+    if (primaryScope.value === 'japan') return 'jp-prefectures'
+    if (primaryScope.value === 'italy') return 'it-provinces'
     if (primaryScope.value === 'us') {
       return usLevel.value === 'county' ? 'us-county' : 'us-states'
     }
@@ -115,6 +121,9 @@ export function useGameSetup() {
     const s = activeScope.value
     if (s === 'world') return regionFilter.value === 'all' ? 'world' : `world:${regionFilter.value}`
     if (s === 'us-states') return regionFilter.value === 'all' ? 'us-states' : `us-states:${regionFilter.value}`
+    if (s === 'my-states') return regionFilter.value === 'all' ? 'my-states' : `my-states:${regionFilter.value}`
+    if (s === 'jp-prefectures') return regionFilter.value === 'all' ? 'jp-prefectures' : `jp-prefectures:${regionFilter.value}`
+    if (s === 'it-provinces') return regionFilter.value === 'all' ? 'it-provinces' : `it-provinces:${regionFilter.value}`
     if (s === 'us-county') return `us-county:${geo.activeUsCountyState.value?.id ?? ''}`
     if (s === 'id-provinces') return 'id-provinces'
     if (s === 'id-kabupaten') return `id-kabupaten:${selectedProvince.value}`
@@ -311,7 +320,7 @@ export function useGameSetup() {
     catch {}
     if (!saved) return
 
-    if (saved.primaryScope === 'world' || saved.primaryScope === 'indonesia' || saved.primaryScope === 'us') {
+    if (PRIMARY_SCOPES.includes(saved.primaryScope)) {
       primaryScope.value = saved.primaryScope
     }
     if (['provinces', 'kabupaten', 'kecamatan', 'mixed'].includes(saved.indonesiaLevel)) {

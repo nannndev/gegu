@@ -3,6 +3,9 @@ import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { Difficulty, Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 import { recordSession } from '~/utils/stats'
 import { saveDailyResult } from '~/utils/daily'
+import { nearMissPoints } from '~/utils/distance'
+import { applyHintPenalty, hintBudget, hintKindFor, spotlightFor } from '~/utils/hints'
+import { scopeProfile } from '~/utils/scopeProfile'
 
 export const TOTAL_ROUNDS = 10
 export const ROUND_SECONDS = 15
@@ -100,6 +103,24 @@ export const useGameStore = defineStore('game', () => {
   const history = ref<RoundResult[]>([])
   const secondsLeft = ref(ROUND_SECONDS)
 
+  /** Sisa jatah petunjuk sesi ini. */
+  const hintsLeft = ref(0)
+  /** Petunjuk sudah dipakai di ronde berjalan — poinnya dipotong separuh. */
+  const hintUsedThisRound = ref(false)
+  /**
+   * Opsi yang dicoret 50:50 di Mode B. Disimpan di store, bukan di komponen
+   * bilah soal: bilah itu dibongkar-pasang oleh `<Transition>` tiap kali
+   * jawaban masuk, jadi state di dalamnya tidak bertahan sampai ronde usai.
+   */
+  const eliminatedIds = ref<string[]>([])
+  /**
+   * Mode A: wilayah yang tetap menyala setelah petunjuk dipakai. Kosong
+   * berarti petunjuk belum dipakai dan seluruh peta tampil normal.
+   */
+  const spotlightIds = ref<string[]>([])
+  /** Region target, kalau petunjuknya kebetulan menyempitkan lewat region. */
+  const revealedRegion = ref<string | null>(null)
+
   const isLastRound = computed(() => currentRound.value >= totalRounds.value)
   const correctCount = computed(() => history.value.filter(h => h.correct).length)
   const accuracy = computed(() =>
@@ -110,7 +131,35 @@ export const useGameStore = defineStore('game', () => {
   const isHardcore = computed(() => difficulty.value === 'hardcore')
   /** Panjang ronde yang berlaku di sesi ini. */
   const roundSeconds = computed(() => secondsFor(difficulty.value))
-  const nextPoints = computed(() => scoreFor(streak.value, difficulty.value))
+  /** Poin kalau ronde ini dijawab benar — sudah termasuk potongan petunjuk. */
+  const nextPoints = computed(() => {
+    const base = scoreFor(streak.value, difficulty.value)
+    return hintUsedThisRound.value ? applyHintPenalty(base) : base
+  })
+
+  /** Jenis petunjuk yang berlaku di mode ini. */
+  const hintKind = computed(() => hintKindFor(mode.value))
+  /** Petunjuk bisa dipakai sekarang? Satu per ronde, selama jatah ada. */
+  const canUseHint = computed(() =>
+    phase.value === 'playing'
+    && hintsLeft.value > 0
+    && !hintUsedThisRound.value
+    && Boolean(currentTarget.value),
+  )
+
+  /**
+   * Wilayah yang dijawab salah, tanpa duplikat. Ini yang diulang oleh sesi
+   * latihan di layar hasil — ronde yang sudah kena tidak perlu diulang.
+   */
+  const missedItems = computed<RegionItem[]>(() => {
+    const byId = new Map<string, RegionItem>()
+    for (const row of history.value) {
+      if (row.correct || byId.has(row.targetId)) continue
+      const item = pool.value.find(p => p.id === row.targetId)
+      if (item) byId.set(row.targetId, item)
+    }
+    return [...byId.values()]
+  })
 
   function resetGame() {
     score.value = 0
@@ -126,6 +175,10 @@ export const useGameStore = defineStore('game', () => {
     history.value = []
     stateName.value = ''
     secondsLeft.value = roundSeconds.value
+    hintUsedThisRound.value = false
+    eliminatedIds.value = []
+    revealedRegion.value = null
+    spotlightIds.value = []
   }
 
   /**
@@ -214,6 +267,9 @@ export const useGameStore = defineStore('game', () => {
     dailyKey.value = options.daily ?? ''
     pool.value = options.pool
     totalRounds.value = Math.min(preferredRounds.value, options.pool.length)
+    // Jatah dihitung dari panjang sesi yang benar-benar berlaku, bukan dari
+    // `preferredRounds` — sesi 20 ronde di pool 6 wilayah cuma jalan 6 ronde.
+    hintsLeft.value = hintBudget(totalRounds.value, difficulty.value)
     nextRound()
   }
 
@@ -234,24 +290,85 @@ export const useGameStore = defineStore('game', () => {
     lastAnswerId.value = null
     feedback.value = null
     secondsLeft.value = roundSeconds.value
+    hintUsedThisRound.value = false
+    eliminatedIds.value = []
+    revealedRegion.value = null
+    spotlightIds.value = []
     phase.value = 'playing'
   }
 
-  /** `answerId === null` berarti waktu habis / klik di luar wilayah mana pun. */
-  function submitAnswer(answerId: string | null, answerName: string | null = null) {
+  /**
+   * Pakai satu petunjuk di ronde berjalan.
+   *
+   * Mode B mencoret dua opsi salah; Mode A mengungkap region targetnya, yang
+   * dipakai peta untuk meredupkan wilayah di luar region itu. Jatahnya
+   * berkurang saat dipakai, dan poin ronde ini otomatis separuh lewat
+   * `nextPoints`.
+   */
+  function useHint() {
+    const target = currentTarget.value
+    if (!canUseHint.value || !target) return
+
+    if (hintKind.value === 'fifty') {
+      const wrong = choices.value.filter(c => c.id !== target.id)
+      // Undi mana yang dicoret, jangan ambil dua yang pertama: urutan opsi
+      // tetap selama ronde, jadi pilihan yang tidak diacak membuat posisi
+      // jawaban benar bisa ditebak dari pola coretannya.
+      eliminatedIds.value = shuffle(wrong).slice(0, 2).map(c => c.id)
+    }
+    else {
+      const ids = spotlightFor(target, pool.value)
+      spotlightIds.value = ids
+      // Region hanya diumumkan di bilah soal kalau penyempitannya memang
+      // lewat region — kalau yang dipakai pemangkasan separuh, menyebut
+      // regionnya akan menjanjikan penyaringan yang tidak terjadi.
+      const narrowedByRegion = ids.every(
+        id => pool.value.find(i => i.id === id)?.region === target.region,
+      )
+      revealedRegion.value = narrowedByRegion ? target.region : null
+    }
+
+    hintUsedThisRound.value = true
+    hintsLeft.value -= 1
+  }
+
+  /**
+   * `answerId === null` berarti waktu habis / klik di luar wilayah mana pun.
+   *
+   * `distanceKm` diukur oleh peta (Mode A) antara pusat wilayah yang diklik
+   * dan pusat target. Tebakan yang meleset tapi masih dalam radius cakupan
+   * dibayar sebagian — mengklik provinsi sebelah bukan hal yang sama dengan
+   * mengklik benua yang salah.
+   */
+  function submitAnswer(
+    answerId: string | null,
+    answerName: string | null = null,
+    distanceKm?: number,
+  ) {
     const target = currentTarget.value
     if (phase.value !== 'playing' || !target) return
 
     const correct = answerId === target.id
-    const points = correct ? scoreFor(streak.value, difficulty.value) : 0
+    const fullPoints = scoreFor(streak.value, difficulty.value)
 
+    // Poin nyaris-kena dihitung dari poin penuh sebelum potongan petunjuk,
+    // lalu potongannya dikenakan sekali di akhir — kalau dipotong dua kali,
+    // tebakan dekat berbantuan petunjuk membayar seperempat dan praktis nol.
+    const nearPoints = (!correct && answerId !== null && distanceKm !== undefined)
+      ? nearMissPoints(fullPoints, distanceKm, scopeProfile(datasetScope.value).nearMissKm)
+      : 0
+
+    const rawPoints = correct ? fullPoints : nearPoints
+    const points = hintUsedThisRound.value ? applyHintPenalty(rawPoints) : rawPoints
+
+    score.value += points
     if (correct) {
-      score.value += points
       streak.value += 1
       bestStreak.value = Math.max(bestStreak.value, streak.value)
     }
     else {
-      // Salah tidak mengurangi skor, hanya memutus streak.
+      // Nyaris-kena tetap memutus streak: yang dibayar adalah kedekatannya,
+      // bukan kebenarannya, dan streak mengukur yang kedua.
       streak.value = 0
     }
 
@@ -265,13 +382,21 @@ export const useGameStore = defineStore('game', () => {
       answerName,
       correct,
       pointsEarned: points,
+      distanceKm,
+      usedHint: hintUsedThisRound.value,
+      level: target.level,
     })
     feedback.value = {
-      kind: correct ? 'correct' : answerId === null ? 'timeout' : 'wrong',
+      kind: correct
+        ? 'correct'
+        : answerId === null
+          ? 'timeout'
+          : nearPoints > 0 ? 'near' : 'wrong',
       targetName: target.name,
       targetIso: target.iso,
       answerName,
       points,
+      distanceKm,
     }
     phase.value = 'answered'
   }
@@ -280,6 +405,35 @@ export const useGameStore = defineStore('game', () => {
     if (phase.value !== 'playing' || !timerEnabled.value) return
     secondsLeft.value -= 1
     if (secondsLeft.value <= 0) submitAnswer(null)
+  }
+
+  /**
+   * Sesi latihan: ulangi hanya wilayah yang tadi salah.
+   *
+   * Seluruh konfigurasi sesi sebelumnya dipakai ulang kecuali pool dan jumlah
+   * rondenya. Yang sengaja dijatuhkan adalah `daily`: hasil harian hanya
+   * boleh dicatat sekali per hari, dan sesi ini memainkan subset soal yang
+   * lebih mudah, jadi skornya tidak sebanding dengan sesi harian utuh.
+   */
+  function startDrill(): boolean {
+    const missed = missedItems.value
+    if (!missed.length) return false
+
+    startGame({
+      mode: mode.value,
+      pool: missed,
+      regionFilter: regionFilter.value,
+      timerEnabled: timerEnabled.value,
+      roundsCount: missed.length,
+      scope: datasetScope.value,
+      difficulty: difficulty.value,
+      provinceName: provinceName.value,
+      cityName: cityName.value,
+      stateName: stateName.value,
+      scopeKey: scopeKey.value,
+      scopeParts: scopeParts.value ?? undefined,
+    })
+    return true
   }
 
   return {
@@ -314,10 +468,20 @@ export const useGameStore = defineStore('game', () => {
     correctCount,
     accuracy,
     nextPoints,
+    hintsLeft,
+    hintUsedThisRound,
+    hintKind,
+    canUseHint,
+    eliminatedIds,
+    spotlightIds,
+    revealedRegion,
+    missedItems,
     startGame,
     finishGame,
     nextRound,
     submitAnswer,
+    useHint,
+    startDrill,
     resetGame,
     tick,
   }

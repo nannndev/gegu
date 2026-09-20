@@ -85,6 +85,38 @@ export function useAudio() {
     osc.stop(now + 0.26)
   }
 
+  /**
+   * Near miss: two rising notes that stop short of resolving.
+   *
+   * Deliberately neither the correct chime nor the wrong buzz — a near miss
+   * that sounds like a flat miss tells the player the partial points were a
+   * fluke, and one that sounds like a win tells them nothing was lost.
+   */
+  function playNear() {
+    const ctx = getContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+
+    // E5 then G5 — the C that would resolve the triad never arrives.
+    const notes = [659.25, 783.99]
+    notes.forEach((freq, index) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + index * 0.09)
+
+      gain.gain.setValueAtTime(0, now + index * 0.09)
+      gain.gain.linearRampToValueAtTime(0.13, now + index * 0.09 + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.09 + 0.26)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now + index * 0.09)
+      osc.stop(now + index * 0.09 + 0.28)
+    })
+  }
+
   /** Subtle tick for countdown urgency */
   function playTick() {
     const ctx = getContext()
@@ -158,6 +190,7 @@ export function useAudio() {
     soundEnabled,
     toggleSound,
     playCorrect,
+    playNear,
     playWrong,
     playTick,
     playClick,

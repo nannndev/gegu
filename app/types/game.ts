@@ -11,6 +11,9 @@ export type DatasetScope =
   | 'id-mixed'
   | 'us-states'
   | 'us-county'
+  | 'my-states'
+  | 'jp-prefectures'
+  | 'it-provinces'
 
 /**
  * Tingkat kesulitan. `hardcore` melucuti semua petunjuk selain bentuk wilayah
@@ -37,6 +40,8 @@ export interface RegionProperties {
   shortName?: string
   /** Singkatan state, mis. "TX". */
   abbr?: string
+  /** Negeri vs wilayah persekutuan; hanya di dataset Malaysia. */
+  kind?: 'state' | 'federal'
 }
 
 export type RegionFeature = Feature<Geometry, RegionProperties>
@@ -72,9 +77,20 @@ export interface RoundResult {
   answerName: string | null
   correct: boolean
   pointsEarned: number
+  /** Jarak tebakan ke target, km. Hanya terisi di Mode A yang meleset. */
+  distanceKm?: number
+  /** Ronde ini dijawab setelah memakai petunjuk. */
+  usedHint?: boolean
+  /** Level target; dipakai layar hasil di mode campuran. */
+  level?: RegionLevel
 }
 
-export type FeedbackKind = 'correct' | 'wrong' | 'timeout'
+/**
+ * `near` = meleset tapi masih dalam radius nyaris-kena, jadi dibayar
+ * sebagian. Dipisah dari `wrong` supaya umpan baliknya bisa bilang
+ * "hampir" alih-alih memperlakukannya sama dengan meleset jauh.
+ */
+export type FeedbackKind = 'correct' | 'near' | 'wrong' | 'timeout'
 
 export interface Feedback {
   kind: FeedbackKind
@@ -82,4 +98,6 @@ export interface Feedback {
   targetIso?: string | null
   answerName: string | null
   points: number
+  /** Jarak tebakan ke target, km; hanya di Mode A yang meleset. */
+  distanceKm?: number
 }
