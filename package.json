@@ -12,6 +12,7 @@
   "dependencies": {
     "@pinia/nuxt": "^1.0.2",
     "@tailwindcss/vite": "^4.3.3",
+    "@vercel/analytics": "^2.0.1",
     "leaflet": "^1.9.4",
     "nuxt": "^4.5.2",
     "pinia": "^4.0.3",

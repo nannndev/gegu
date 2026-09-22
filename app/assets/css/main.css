@@ -571,6 +571,139 @@ body {
   transform: scale(0.85) translateY(-4px);
 }
 
+/*
+ * ─── Scope Chips ─────────────────────────────────────────────────
+ * Deretan pill horizontal untuk memilih wilayah. Warna aksen diatur
+ * lewat `data-accent` + `data-active`, bukan rantai kelas Tailwind.
+ */
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--surface-raised);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scope-chip:hover {
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+}
+
+.dark .scope-chip:hover {
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.25);
+}
+
+.scope-chip:active {
+  transform: scale(0.97);
+}
+
+.scope-chip-icon {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.scope-chip-label {
+  color: #475569;
+}
+
+.dark .scope-chip-label {
+  color: #94a3b8;
+}
+
+/* ── Aksen per warna ── */
+.scope-chip[data-active='true'] {
+  box-shadow:
+    0 0 0 2px rgba(14, 165, 233, 0.18),
+    0 4px 16px -4px rgba(14, 165, 233, 0.2);
+}
+
+.scope-chip[data-active='true'] .scope-chip-label { color: #0284c7; }
+.dark .scope-chip[data-active='true'] .scope-chip-label { color: #7dd3fc; }
+
+/* sky (world) */
+.scope-chip[data-accent='sky'][data-active='true'] {
+  border-color: rgba(14, 165, 233, 0.6);
+  background: rgba(14, 165, 233, 0.12);
+}
+.scope-chip[data-accent='sky'][data-active='true'] .scope-chip-label { color: #0284c7; }
+.dark .scope-chip[data-accent='sky'][data-active='true'] .scope-chip-label { color: #7dd3fc; }
+
+/* rose (indonesia, japan) */
+.scope-chip[data-accent='rose'][data-active='true'] {
+  border-color: rgba(244, 63, 94, 0.6);
+  background: rgba(244, 63, 94, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(244, 63, 94, 0.15),
+    0 4px 16px -4px rgba(244, 63, 94, 0.2);
+}
+.scope-chip[data-accent='rose'][data-active='true'] .scope-chip-label { color: #e11d48; }
+.dark .scope-chip[data-accent='rose'][data-active='true'] .scope-chip-label { color: #fda4af; }
+
+/* blue (us) */
+.scope-chip[data-accent='blue'][data-active='true'] {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(59, 130, 246, 0.15),
+    0 4px 16px -4px rgba(59, 130, 246, 0.2);
+}
+.scope-chip[data-accent='blue'][data-active='true'] .scope-chip-label { color: #2563eb; }
+.dark .scope-chip[data-accent='blue'][data-active='true'] .scope-chip-label { color: #93c5fd; }
+
+/* amber (malaysia) */
+.scope-chip[data-accent='amber'][data-active='true'] {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(245, 158, 11, 0.15),
+    0 4px 16px -4px rgba(245, 158, 11, 0.2);
+}
+.scope-chip[data-accent='amber'][data-active='true'] .scope-chip-label { color: #d97706; }
+.dark .scope-chip[data-accent='amber'][data-active='true'] .scope-chip-label { color: #fcd34d; }
+
+/* emerald (italy) */
+.scope-chip[data-accent='emerald'][data-active='true'] {
+  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.15),
+    0 4px 16px -4px rgba(16, 185, 129, 0.2);
+}
+.scope-chip[data-accent='emerald'][data-active='true'] .scope-chip-label { color: #059669; }
+.dark .scope-chip[data-accent='emerald'][data-active='true'] .scope-chip-label { color: #6ee7b7; }
+
+/*
+ * ─── Launch Button Pulse ─────────────────────────────────────────
+ * Lingkaran cahaya lembut yang bernapas di sekitar tombol Start,
+ * menarik perhatian tanpa mengganggu.
+ */
+@keyframes launch-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.35), 0 8px 24px -6px rgba(14, 165, 233, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(14, 165, 233, 0), 0 12px 32px -4px rgba(14, 165, 233, 0.35); }
+}
+
+.launch-pulse:not(:disabled) {
+  animation: launch-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.launch-pulse:hover:not(:disabled) {
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu-rise,
   .pick-card,
@@ -581,6 +714,8 @@ body {
   .streak-pop-leave-active,
   .timer-ring-critical,
   .round-track-active,
+  .scope-chip,
+  .launch-pulse,
   .hud-score.hud-score-bumping .hud-score-value {
     animation: none !important;
     transition: none !important;

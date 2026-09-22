@@ -42,6 +42,32 @@ const SCOPE_ACCENT = {
   italy: { iso: 'IT', ambient: 'bg-ambient-italy' },
 } as const
 
+/**
+ * Data untuk scope chips — menggantikan 6 kartu besar yang terpisah.
+ * Setiap entri punya warna aksen sendiri supaya template cukup satu v-for.
+ */
+const SCOPE_CHIPS = [
+  { key: 'world' as const, icon: '🌍', accent: 'sky' },
+  { key: 'indonesia' as const, icon: '🇮🇩', accent: 'rose' },
+  { key: 'us' as const, icon: '🇺🇸', accent: 'blue' },
+  { key: 'malaysia' as const, icon: '🇲🇾', accent: 'amber' },
+  { key: 'japan' as const, icon: '🇯🇵', accent: 'rose' },
+  { key: 'italy' as const, icon: '🇮🇹', accent: 'emerald' },
+] as const
+
+/** Nama kunci i18n untuk judul & deskripsi tiap scope. */
+const SCOPE_I18N_MAP: Record<string, { title: string, desc: string }> = {
+  world: { title: 'setup.scope.world.title', desc: 'setup.scope.world.desc' },
+  indonesia: { title: 'setup.scope.indonesia.title', desc: 'setup.scope.indonesia.desc' },
+  us: { title: 'setup.scope.us.title', desc: 'setup.scope.us.desc' },
+  malaysia: { title: 'setup.scope.my.title', desc: 'setup.scope.my.desc' },
+  japan: { title: 'setup.scope.jp.title', desc: 'setup.scope.jp.desc' },
+  italy: { title: 'setup.scope.it.title', desc: 'setup.scope.it.desc' },
+}
+
+const activeChip = computed(() => SCOPE_CHIPS.find(c => c.key === setup.primaryScope.value)!)
+const activeScopeI18n = computed(() => SCOPE_I18N_MAP[setup.primaryScope.value]!)
+
 const scopeAccent = computed(() => SCOPE_ACCENT[setup.primaryScope.value])
 const backdropIso = computed(() => scopeAccent.value.iso)
 const ambientClass = computed(() => scopeAccent.value.ambient)
@@ -462,150 +488,34 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
-          <!-- Dunia vs Indonesia vs US vs Malaysia -->
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" :aria-label="t('setup.scope.group')">
+          <!-- Scope chips — deretan horizontal ringkas -->
+          <div class="flex flex-wrap gap-2" role="radiogroup" :aria-label="t('setup.scope.group')">
             <button
+              v-for="chip in SCOPE_CHIPS"
+              :key="chip.key"
               type="button"
               role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'world'"
-              :class="setup.primaryScope.value === 'world' ? '!border-sky-500/60 !bg-sky-500/10 ring-2 ring-sky-500/20' : ''"
-              @click="setup.setPrimaryScope('world')"
+              class="scope-chip focusable"
+              :aria-checked="setup.primaryScope.value === chip.key"
+              :data-accent="chip.accent"
+              :data-active="setup.primaryScope.value === chip.key"
+              @click="setup.setPrimaryScope(chip.key)"
             >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition"
-                :class="setup.primaryScope.value === 'world' ? 'border-sky-500/50 bg-sky-500/20 text-sky-600 dark:text-sky-400' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80 text-slate-500'"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.world.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.world.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'world'"
-                class="shrink-0 text-sm font-bold text-sky-500"
-                aria-hidden="true"
-              >✓</span>
+              <span class="scope-chip-icon" aria-hidden="true">{{ chip.icon }}</span>
+              <span class="scope-chip-label">{{ t(SCOPE_I18N_MAP[chip.key].title) }}</span>
             </button>
+          </div>
 
-            <button
-              type="button"
-              role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'indonesia'"
-              :class="setup.primaryScope.value === 'indonesia' ? '!border-rose-500/60 !bg-rose-500/10 ring-2 ring-rose-500/20' : ''"
-              @click="setup.setPrimaryScope('indonesia')"
-            >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
-                :class="setup.primaryScope.value === 'indonesia' ? 'border-rose-500/50 bg-rose-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
-              >🇮🇩</span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.indonesia.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.indonesia.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'indonesia'"
-                class="shrink-0 text-sm font-bold text-rose-500"
-                aria-hidden="true"
-              >✓</span>
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'us'"
-              :class="setup.primaryScope.value === 'us' ? '!border-blue-500/60 !bg-blue-500/10 ring-2 ring-blue-500/20' : ''"
-              @click="setup.setPrimaryScope('us')"
-            >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
-                :class="setup.primaryScope.value === 'us' ? 'border-blue-500/50 bg-blue-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
-              >🇺🇸</span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.us.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.us.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'us'"
-                class="shrink-0 text-sm font-bold text-blue-500"
-                aria-hidden="true"
-              >✓</span>
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'malaysia'"
-              :class="setup.primaryScope.value === 'malaysia' ? '!border-amber-500/60 !bg-amber-500/10 ring-2 ring-amber-500/20' : ''"
-              @click="setup.setPrimaryScope('malaysia')"
-            >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
-                :class="setup.primaryScope.value === 'malaysia' ? 'border-amber-500/50 bg-amber-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
-              >🇲🇾</span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.my.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.my.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'malaysia'"
-                class="shrink-0 text-sm font-bold text-amber-500"
-                aria-hidden="true"
-              >✓</span>
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'japan'"
-              :class="setup.primaryScope.value === 'japan' ? '!border-rose-400/60 !bg-rose-400/10 ring-2 ring-rose-400/20' : ''"
-              @click="setup.setPrimaryScope('japan')"
-            >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
-                :class="setup.primaryScope.value === 'japan' ? 'border-rose-400/50 bg-rose-400/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
-              >🇯🇵</span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.jp.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.jp.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'japan'"
-                class="shrink-0 text-sm font-bold text-rose-400"
-                aria-hidden="true"
-              >✓</span>
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              class="pick-card focusable flex items-start gap-3.5 p-4 text-left"
-              :aria-checked="setup.primaryScope.value === 'italy'"
-              :class="setup.primaryScope.value === 'italy' ? '!border-emerald-500/60 !bg-emerald-500/10 ring-2 ring-emerald-500/20' : ''"
-              @click="setup.setPrimaryScope('italy')"
-            >
-              <span
-                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition"
-                :class="setup.primaryScope.value === 'italy' ? 'border-emerald-500/50 bg-emerald-500/15' : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/80'"
-              >🇮🇹</span>
-              <span class="min-w-0 flex-1">
-                <span class="font-display block text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.scope.it.title') }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('setup.scope.it.desc') }}</span>
-              </span>
-              <span
-                v-if="setup.primaryScope.value === 'italy'"
-                class="shrink-0 text-sm font-bold text-emerald-500"
-                aria-hidden="true"
-              >✓</span>
-            </button>
+          <!-- Deskripsi scope terpilih + pool count -->
+          <div class="mt-3 flex items-center gap-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 px-4 py-2.5 transition-all duration-200">
+            <span class="text-lg" aria-hidden="true">{{ activeChip.icon }}</span>
+            <div class="min-w-0 flex-1">
+              <span class="block text-xs font-bold text-slate-900 dark:text-white">{{ t(activeScopeI18n.title) }}</span>
+              <span class="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ t(activeScopeI18n.desc) }}</span>
+            </div>
+            <span class="hidden shrink-0 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400 sm:inline-flex">
+              {{ t('setup.scope.poolReady', { n: setup.poolSize.value }) }}
+            </span>
           </div>
 
           <!-- Filter benua / kepulauan / region AS -->
@@ -1195,7 +1105,7 @@ onBeforeUnmount(() => {
     <!-- ── Launch bar ─────────────────────────────────────────── -->
     <div class="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-6 sm:pb-4 lg:px-10">
       <div class="relative mx-auto w-full max-w-[1400px] overflow-hidden rounded-2xl border border-white/70 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 shadow-2xl backdrop-blur-2xl backdrop-saturate-150">
-        <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-200 dark:bg-slate-800">
+        <div class="absolute inset-x-0 top-0 h-1 bg-slate-200/60 dark:bg-slate-800/60">
           <div
             class="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-300"
             :style="{ width: `${Math.max(5, Math.min(100, (setup.effectiveRounds.value / Math.max(setup.poolSize.value, 1)) * 100))}%` }"
@@ -1248,7 +1158,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             :disabled="!canStart"
-            class="focusable group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 sm:w-auto"
+            class="focusable launch-pulse group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 sm:w-auto"
             @click="start()"
           >
             <span
