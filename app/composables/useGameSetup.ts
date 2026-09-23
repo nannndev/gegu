@@ -2,10 +2,10 @@ import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { DatasetScope, Difficulty, GameMode, RegionItem, RegionLevel } from '~/types/game'
 import { HARDCORE_SECONDS, ROUND_SECONDS } from '~/stores/game'
 
-export type PrimaryScope = 'world' | 'indonesia' | 'us' | 'malaysia' | 'japan' | 'italy'
+export type PrimaryScope = 'world' | 'indonesia' | 'us' | 'malaysia' | 'japan' | 'italy' | 'germany'
 
 /** Nilai `PrimaryScope` yang sah; dipakai saat memulihkan setup tersimpan. */
-const PRIMARY_SCOPES: PrimaryScope[] = ['world', 'indonesia', 'us', 'malaysia', 'japan', 'italy']
+const PRIMARY_SCOPES: PrimaryScope[] = ['world', 'indonesia', 'us', 'malaysia', 'japan', 'italy', 'germany']
 export type IndonesiaLevel = 'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'
 export type UsLevel = 'states' | 'county'
 
@@ -69,6 +69,7 @@ export function useGameSetup() {
     if (primaryScope.value === 'malaysia') return 'my-states'
     if (primaryScope.value === 'japan') return 'jp-prefectures'
     if (primaryScope.value === 'italy') return 'it-provinces'
+    if (primaryScope.value === 'germany') return 'de-states'
     if (primaryScope.value === 'us') {
       return usLevel.value === 'county' ? 'us-county' : 'us-states'
     }
@@ -124,6 +125,7 @@ export function useGameSetup() {
     if (s === 'my-states') return regionFilter.value === 'all' ? 'my-states' : `my-states:${regionFilter.value}`
     if (s === 'jp-prefectures') return regionFilter.value === 'all' ? 'jp-prefectures' : `jp-prefectures:${regionFilter.value}`
     if (s === 'it-provinces') return regionFilter.value === 'all' ? 'it-provinces' : `it-provinces:${regionFilter.value}`
+    if (s === 'de-states') return regionFilter.value === 'all' ? 'de-states' : `de-states:${regionFilter.value}`
     if (s === 'us-county') return `us-county:${geo.activeUsCountyState.value?.id ?? ''}`
     if (s === 'id-provinces') return 'id-provinces'
     if (s === 'id-kabupaten') return `id-kabupaten:${selectedProvince.value}`
@@ -171,7 +173,11 @@ export function useGameSetup() {
   )
 
   const modeLabel = computed(() =>
-    selectedMode.value === 'A' ? t('setup.mode.a.title') : t('setup.mode.b.title'),
+    selectedMode.value === 'A'
+      ? t('setup.mode.a.title')
+      : selectedMode.value === 'C'
+        ? t('setup.mode.c.title')
+        : t('setup.mode.b.title'),
   )
 
   /** Setel ulang filter & ronde setelah cakupan berganti. */
@@ -329,7 +335,7 @@ export function useGameSetup() {
     if (saved.usLevel === 'states' || saved.usLevel === 'county') {
       usLevel.value = saved.usLevel
     }
-    if (saved.mode === 'A' || saved.mode === 'B') selectedMode.value = saved.mode
+    if (saved.mode === 'A' || saved.mode === 'B' || saved.mode === 'C') selectedMode.value = saved.mode
     if (saved.difficulty === 'normal' || saved.difficulty === 'hardcore') {
       difficulty.value = saved.difficulty
     }

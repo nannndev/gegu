@@ -18,7 +18,7 @@ npm run generate   # static — siap deploy ke Vercel/Netlify/GitHub Pages
 - **Mode A — Cari di Peta:** nama wilayah ditampilkan, pemain mengklik lokasinya di peta.
 - **Mode B — Tebak Nama:** satu wilayah disorot dan peta auto-zoom ke situ, pemain memilih namanya dari 4 opsi.
 
-Cakupannya bisa dunia (175 negara), 38 provinsi, kab/kota satu provinsi, kecamatan satu kota, campuran multi-tingkat, 50 state AS beserta countynya, 16 negeri Malaysia, 47 prefektur Jepang, atau 110 provinsi Italia. Panjang sesi 5–20 ronde tergantung besar pool. Benar `= 10 + (streak × 2)` poin; salah tidak mengurangi skor tapi memutus streak. Di Mode A, tebakan yang masih dalam radius cakupan dibayar sebagian (maksimal separuh poin penuh). Wilayah tidak berulang dalam satu sesi.
+Cakupannya bisa dunia (175 negara), 38 provinsi, kab/kota satu provinsi, kecamatan satu kota, campuran multi-tingkat, 50 state AS beserta countynya, 16 negeri Malaysia, 47 prefektur Jepang, 110 provinsi Italia, atau 16 negara bagian Jerman. Panjang sesi 5–20 ronde tergantung besar pool. Benar `= 10 + (streak × 2)` poin; salah tidak mengurangi skor tapi memutus streak. Di Mode A, tebakan yang masih dalam radius cakupan dibayar sebagian (maksimal separuh poin penuh). Wilayah tidak berulang dalam satu sesi.
 
 **Tantangan harian** (`app/utils/daily.ts`) mengundi satu konfigurasi per tanggal lewat PRNG ber-seed, jadi semua pemain dapat soal yang sama di hari yang sama tanpa perlu server.
 
@@ -60,7 +60,7 @@ node scripts/build-geodata.mjs
 
 Script tersebut memangkas properti ke `name` / `name_id` / `iso_a2` / `region` / `subregion`, membulatkan koordinat ke 3 desimal, dan membuang Antarktika.
 
-**Lisensi tiap dataset berbeda, dan itu menentukan sumbernya.** Direktori ini ikut dipublikasikan bersama aplikasi, jadi sumber yang melarang redistribusi tidak bisa dipakai untuk dataset baru. Kecamatan Indonesia memakai GADM dan **tidak** boleh diredistribusi ([`KECAMATAN.md`](app/assets/data/KECAMATAN.md)); county AS memakai US Census (public domain); negeri Malaysia, prefektur Jepang, dan provinsi Italia memakai Natural Earth (public domain, [`MALAYSIA.md`](app/assets/data/MALAYSIA.md) · [`JEPANG.md`](app/assets/data/JEPANG.md) · [`ITALIA.md`](app/assets/data/ITALIA.md)). Untuk Malaysia, repo GeoJSON populer di GitHub sengaja dihindari — kebanyakan tanpa lisensi atau diam-diam turunan GADM.
+**Lisensi tiap dataset berbeda, dan itu menentukan sumbernya.** Direktori ini ikut dipublikasikan bersama aplikasi, jadi sumber yang melarang redistribusi tidak bisa dipakai untuk dataset baru. Kecamatan Indonesia memakai GADM dan **tidak** boleh diredistribusi ([`KECAMATAN.md`](app/assets/data/KECAMATAN.md)); county AS memakai US Census (public domain); negeri Malaysia, prefektur Jepang, provinsi Italia, dan negara bagian Jerman memakai Natural Earth (public domain, [`MALAYSIA.md`](app/assets/data/MALAYSIA.md) · [`JEPANG.md`](app/assets/data/JEPANG.md) · [`ITALIA.md`](app/assets/data/ITALIA.md) · [`DEUTSCHLAND.md`](app/assets/data/DEUTSCHLAND.md)). Untuk Malaysia, repo GeoJSON populer di GitHub sengaja dihindari — kebanyakan tanpa lisensi atau diam-diam turunan GADM.
 
 ## Struktur
 
@@ -78,12 +78,12 @@ app/
 │                     geo · flagPalette
 ├── types/game.ts
 └── assets/data/      countries · provinces · kabupaten · kecamatan/
-                      us-states · us-county/ · my-states · jp-prefectures · it-provinces
+                      us-states · us-county/ · my-states · jp-prefectures · it-provinces · de-states
 docs/                 PRD
 scripts/              build-geodata.mjs · build-us.mjs · build-my.mjs
-                      build-jp.mjs · build-it.mjs
+                      build-jp.mjs · build-it.mjs · build-de.mjs
 ```
 
 ## Status
 
-Semua acceptance criteria PRD §10 terpenuhi, plus level provinsi/kab/kecamatan, cakupan Amerika Serikat (state & county), toggle bahasa ID/EN, mode hardcore, sound effect, share skor, tema terang-gelap, dan tantangan harian. Backlog tersisa: leaderboard daring — satu-satunya item yang butuh backend, jadi menunggu `ssr: false` digeser ke hybrid rendering.
+Semua acceptance criteria PRD §10 terpenuhi, plus level provinsi/kab/kecamatan, cakupan Amerika Serikat (state & county), Malaysia (negeri), Jepang (prefektur), Italia (provinsi), Jerman (negara bagian), toggle bahasa ID/EN, mode hardcore, sound effect, share skor, tema terang-gelap, dan tantangan harian. Backlog tersisa: leaderboard daring — satu-satunya item yang butuh backend, jadi menunggu `ssr: false` digeser ke hybrid rendering.

@@ -140,6 +140,11 @@ body {
   background: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.14) 0%, rgba(244, 63, 94, 0.05) 45%, transparent 75%);
 }
 
+/* Jerman: emas–merah, mengikuti hitam–merah–emas Bundesflagge. */
+.bg-ambient-germany {
+  background: radial-gradient(circle at 50% 0%, rgba(234, 179, 8, 0.14) 0%, rgba(220, 38, 38, 0.06) 45%, transparent 75%);
+}
+
 .dark .bg-ambient-glow {
   background: radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.18) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%);
 }
@@ -162,6 +167,39 @@ body {
 
 .dark .bg-ambient-japan {
   background: radial-gradient(circle at 50% -10%, rgba(225, 29, 72, 0.17) 0%, rgba(244, 63, 94, 0.07) 40%, transparent 70%);
+}
+
+.dark .bg-ambient-germany {
+  background: radial-gradient(circle at 50% -10%, rgba(234, 179, 8, 0.17) 0%, rgba(220, 38, 38, 0.08) 40%, transparent 70%);
+}
+
+/*
+ * Bintik latar — mengisi ruang kosong di sekitar globe supaya menu tidak
+ * terasa hampa. Terang: titik-titik abu samar. Gelap: bintang-bintang kecil
+ * yang mengelilingi globe.
+ */
+.backdrop-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 24px 32px, rgb(148 163 184 / 0.55), transparent 55%),
+    radial-gradient(1px 1px at 68px 76px, rgb(148 163 184 / 0.4), transparent 55%),
+    radial-gradient(1.5px 1.5px at 104px 24px, rgb(148 163 184 / 0.5), transparent 55%),
+    radial-gradient(1px 1px at 152px 60px, rgb(148 163 184 / 0.35), transparent 55%),
+    radial-gradient(2px 2px at 200px 44px, rgb(148 163 184 / 0.45), transparent 55%);
+  background-size: 240px 120px;
+  background-repeat: repeat;
+  opacity: 0.4;
+}
+
+.dark .backdrop-stars {
+  background-image:
+    radial-gradient(1px 1px at 24px 32px, rgb(255 255 255 / 0.6), transparent 55%),
+    radial-gradient(1px 1px at 68px 76px, rgb(255 255 255 / 0.35), transparent 55%),
+    radial-gradient(1.5px 1.5px at 104px 24px, rgb(255 255 255 / 0.5), transparent 55%),
+    radial-gradient(1px 1px at 152px 60px, rgb(255 255 255 / 0.3), transparent 55%),
+    radial-gradient(2px 2px at 200px 44px, rgb(255 255 255 / 0.5), transparent 55%);
+  opacity: 0.55;
 }
 
 /*
@@ -685,6 +723,17 @@ body {
 }
 .scope-chip[data-accent='emerald'][data-active='true'] .scope-chip-label { color: #059669; }
 .dark .scope-chip[data-accent='emerald'][data-active='true'] .scope-chip-label { color: #6ee7b7; }
+
+/* red (germany) */
+.scope-chip[data-accent='red'][data-active='true'] {
+  border-color: rgba(220, 38, 38, 0.6);
+  background: rgba(220, 38, 38, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(220, 38, 38, 0.15),
+    0 4px 16px -4px rgba(220, 38, 38, 0.2);
+}
+.scope-chip[data-accent='red'][data-active='true'] .scope-chip-label { color: #dc2626; }
+.dark .scope-chip[data-accent='red'][data-active='true'] .scope-chip-label { color: #fca5a5; }
 
 /*
  * ─── Launch Button Pulse ─────────────────────────────────────────

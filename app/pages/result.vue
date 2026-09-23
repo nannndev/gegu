@@ -122,6 +122,7 @@ const columnHeader = computed(() => {
   if (game.datasetScope === 'my-states') return t('unit.negeri')
   if (game.datasetScope === 'jp-prefectures') return t('unit.prefecture')
   if (game.datasetScope === 'it-provinces') return t('unit.provincia')
+  if (game.datasetScope === 'de-states') return t('unit.bundesland')
   return t('unit.country')
 })
 
@@ -135,6 +136,7 @@ function rowFlag(iso?: string | null) {
   if (game.datasetScope.startsWith('my')) return '🇲🇾'
   if (game.datasetScope.startsWith('jp')) return '🇯🇵'
   if (game.datasetScope.startsWith('it')) return '🇮🇹'
+  if (game.datasetScope.startsWith('de')) return '🇩🇪'
   return '🇮🇩'
 }
 

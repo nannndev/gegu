@@ -58,6 +58,8 @@ export const en: Record<MessageKey, string> = {
   'scope.jpPrefecturesFiltered': 'Japan · {region}',
   'scope.itProvinces': 'Italy · 110 Provinces',
   'scope.itProvincesFiltered': 'Italy · {region}',
+  'scope.deStates': 'Germany · 16 States',
+  'scope.deStatesFiltered': 'Germany · {region}',
   'scope.cityFallback': 'this city',
   'scope.provinceFallback': 'this province',
   'scope.stateFallback': 'this state',
@@ -70,6 +72,7 @@ export const en: Record<MessageKey, string> = {
   'unit.negeri': 'states',
   'unit.prefecture': 'prefectures',
   'unit.provincia': 'provinces',
+  'unit.bundesland': 'states',
   'unit.region': 'places',
 
   // ── Home: hero ──────────────────────────────────────────────
@@ -85,6 +88,7 @@ export const en: Record<MessageKey, string> = {
   'home.chip.negeri': '16 Malaysian states',
   'home.chip.prefecture': '47 Japanese prefectures',
   'home.chip.provincia': '110 Italian provinces',
+  'home.chip.bundesland': '16 German states',
   'home.chip.countries': '175 countries',
 
   // ── Home: daily challenge ───────────────────────────────────
@@ -124,6 +128,11 @@ export const en: Record<MessageKey, string> = {
   'setup.filter.itRegion': 'Want to focus on one Italian region?',
   'setup.filter.itRegionSearch': 'Search Italian regions…',
   'setup.filter.allItRegions': 'Everywhere (110 provinces)',
+  'setup.scope.de.title': 'Germany',
+  'setup.scope.de.desc': '16 federal states, from Bavaria to the Baltic.',
+  'setup.filter.deRegion': 'Want to focus on one part of Germany?',
+  'setup.filter.deRegionSearch': 'Search German regions…',
+  'setup.filter.allDeRegions': 'Everywhere (16 states)',
   'setup.filter.continent': 'Want to focus on one continent?',
   'setup.filter.island': 'Want to focus on one island group?',
   'setup.filter.usRegion': 'Want to focus on one US region?',
@@ -190,6 +199,8 @@ export const en: Record<MessageKey, string> = {
   'setup.mode.b.title': 'Name the place',
   'setup.mode.b.short': 'Name it',
   'setup.mode.b.desc': 'We highlight it, you pick from 4 options.',
+  'setup.mode.c.title': 'Distance Chain',
+  'setup.mode.c.desc': 'Guess the target; get told how far off each guess is.',
 
   // ── Home: step 3, session ───────────────────────────────────
   'setup.session.title': 'Set up the session',
@@ -281,6 +292,7 @@ export const en: Record<MessageKey, string> = {
   'prompt.a.myStates': 'Find {name} on the map of Malaysia.',
   'prompt.a.jpPrefectures': 'Find {name} Prefecture on the map of Japan.',
   'prompt.a.itProvinces': 'Find the province of {name} on the map of Italy.',
+  'prompt.a.deStates': 'Find {name} on the map of Germany.',
   'prompt.a.usCounty': 'Find {name}, then click it on the map.',
   'prompt.b.kecamatan': 'Which district in {city} is highlighted?',
   'prompt.b.kecamatanMixed': 'Which district is highlighted on the map?',
@@ -292,6 +304,7 @@ export const en: Record<MessageKey, string> = {
   'prompt.b.myStates': 'Which Malaysian state is highlighted?',
   'prompt.b.jpPrefectures': 'Which prefecture is highlighted on the map?',
   'prompt.b.itProvinces': 'Which Italian province is highlighted?',
+  'prompt.b.deStates': 'Which German state is highlighted?',
   'prompt.b.usCounty': 'Which county is highlighted in {state}?',
   'prompt.b.cityFallback': 'this city',
   'prompt.b.provinceFallback': 'this province',
@@ -303,6 +316,7 @@ export const en: Record<MessageKey, string> = {
   'prompt.badge.myStates': 'Malaysia · 16 States',
   'prompt.badge.jpPrefectures': 'Japan · 47 Prefectures',
   'prompt.badge.itProvinces': 'Italy · 110 Provinces',
+  'prompt.badge.deStates': 'Germany · 16 States',
 
   // ── Answer feedback ─────────────────────────────────────────
   'feedback.correct': 'Nailed it (+{n} points)',
@@ -391,9 +405,32 @@ export const en: Record<MessageKey, string> = {
   'map.view.satelliteHint': 'Real imagery from above',
   'map.view.blueprint': 'Blueprint',
   'map.view.blueprintHint': 'Light ground, crisp lines',
+  'map.view.globe': '3D Globe',
+  'map.view.globeHint': 'Spinning world, click a country',
   'map.zoomIn': 'Zoom in',
   'map.zoomOut': 'Zoom out',
   'map.resetCamera': 'Reset the view',
+
+  // ── Distance chain mode ──────────────────────────────────────
+  'chain.title': 'Find the Target',
+  'chain.target': 'Target',
+  'chain.subtitle': 'One secret target — guess until you hit it.',
+  'chain.hint': 'Click a region — greener means closer to the target.',
+  'chain.blocked': 'Chain mode is not available for mixed scopes.',
+  'chain.guesses': '{n} guesses',
+  'chain.solved.in': 'in {n} guesses',
+  'chain.solved.target': 'The target was {name}.',
+  'chain.again': 'Play again',
+  'chain.home': 'Back to menu',
+  'chain.rank.perfect': 'Perfect',
+  'chain.rank.great': 'Excellent',
+  'chain.rank.good': 'Good',
+  'chain.rank.ok': 'Warm',
+
+  // ── Support links ───────────────────────────────────────────
+  'support.github': 'Source code on GitHub',
+  'support.contributors': 'Contributors',
+  'support.donate': 'Support with a donation',
   // ── Data errors ─────────────────────────────────────────────
   'error.loadFailed': 'Could not load the map data.',
 }

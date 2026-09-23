@@ -76,6 +76,7 @@ const LEVEL_BY_SCOPE: Record<DatasetScope, RegionLevel> = {
   'my-states': 'province',
   'jp-prefectures': 'province',
   'it-provinces': 'province',
+  'de-states': 'province',
 }
 
 function levelFor(scope: DatasetScope): RegionLevel {
@@ -131,6 +132,9 @@ async function loadRegionSet(
   }
   else if (code === 'it-provinces') {
     data = (await import('~/assets/data/it-provinces.geo.json')).default as unknown as RegionCollection
+  }
+  else if (code === 'de-states') {
+    data = (await import('~/assets/data/de-states.geo.json')).default as unknown as RegionCollection
   }
   else if (code === 'id-kabupaten') {
     data = (await import('~/assets/data/indonesia-kabupaten.geo.json')).default as unknown as RegionCollection

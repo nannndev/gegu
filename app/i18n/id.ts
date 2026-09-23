@@ -56,6 +56,8 @@ export const id = {
   'scope.jpPrefecturesFiltered': 'Jepang · {region}',
   'scope.itProvinces': 'Italia · 110 Provinsi',
   'scope.itProvincesFiltered': 'Italia · {region}',
+  'scope.deStates': 'Jerman · 16 Negara Bagian',
+  'scope.deStatesFiltered': 'Jerman · {region}',
   'scope.cityFallback': 'Kota',
   'scope.provinceFallback': 'Provinsi',
   'scope.stateFallback': 'State',
@@ -68,6 +70,7 @@ export const id = {
   'unit.negeri': 'negeri',
   'unit.prefecture': 'prefektur',
   'unit.provincia': 'provinsi',
+  'unit.bundesland': 'negara bagian',
   'unit.region': 'wilayah',
 
   // ── Home: hero ──────────────────────────────────────────────
@@ -83,6 +86,7 @@ export const id = {
   'home.chip.negeri': '16 negeri Malaysia',
   'home.chip.prefecture': '47 prefektur Jepang',
   'home.chip.provincia': '110 provinsi Italia',
+  'home.chip.bundesland': '16 negara bagian Jerman',
   'home.chip.countries': '175 negara',
 
   // ── Home: tantangan harian ──────────────────────────────────
@@ -122,6 +126,11 @@ export const id = {
   'setup.filter.itRegion': 'Mau fokus di region mana?',
   'setup.filter.itRegionSearch': 'Cari region Italia…',
   'setup.filter.allItRegions': 'Semua region (110 provinsi)',
+  'setup.scope.de.title': 'Jerman',
+  'setup.scope.de.desc': '16 negara bagian, dari Bayern ke Laut Baltik.',
+  'setup.filter.deRegion': 'Mau fokus di wilayah mana?',
+  'setup.filter.deRegionSearch': 'Cari wilayah Jerman…',
+  'setup.filter.allDeRegions': 'Semua wilayah (16 negara bagian)',
   'setup.filter.continent': 'Mau fokus di benua mana?',
   'setup.filter.island': 'Mau fokus di kepulauan mana?',
   'setup.filter.usRegion': 'Mau fokus di wilayah mana?',
@@ -188,6 +197,8 @@ export const id = {
   'setup.mode.b.title': 'Tebak namanya',
   'setup.mode.b.short': 'Tebak nama',
   'setup.mode.b.desc': 'Kami sorot wilayahnya, kamu pilih dari 4 opsi.',
+  'setup.mode.c.title': 'Rantai Jarak',
+  'setup.mode.c.desc': 'Tebak target, dikasih tahu seberapa jauh tebakanmu.',
 
   // ── Home: langkah 3, sesi ───────────────────────────────────
   'setup.session.title': 'Atur sesinya',
@@ -279,6 +290,7 @@ export const id = {
   'prompt.a.myStates': 'Cari {name} di peta Malaysia.',
   'prompt.a.jpPrefectures': 'Cari Prefektur {name} di peta Jepang.',
   'prompt.a.itProvinces': 'Cari Provinsi {name} di peta Italia.',
+  'prompt.a.deStates': 'Cari {name} di peta Jerman.',
   'prompt.a.usCounty': 'Cari {name}, lalu klik wilayahnya di peta.',
   'prompt.b.kecamatan': 'Kecamatan mana yang sedang disorot di {city}?',
   'prompt.b.kecamatanMixed': 'Kecamatan mana yang sedang disorot di peta?',
@@ -290,6 +302,7 @@ export const id = {
   'prompt.b.myStates': 'Negeri mana yang sedang disorot di Malaysia?',
   'prompt.b.jpPrefectures': 'Prefektur mana yang sedang disorot di Jepang?',
   'prompt.b.itProvinces': 'Provinsi mana yang sedang disorot di Italia?',
+  'prompt.b.deStates': 'Negara bagian mana yang sedang disorot di Jerman?',
   'prompt.b.usCounty': 'County mana yang sedang disorot di {state}?',
   'prompt.b.cityFallback': 'kota ini',
   'prompt.b.provinceFallback': 'provinsi ini',
@@ -301,6 +314,7 @@ export const id = {
   'prompt.badge.myStates': 'Malaysia · 16 Negeri',
   'prompt.badge.jpPrefectures': 'Jepang · 47 Prefektur',
   'prompt.badge.itProvinces': 'Italia · 110 Provinsi',
+  'prompt.badge.deStates': 'Jerman · 16 Negara Bagian',
 
   // ── Umpan balik jawaban ─────────────────────────────────────
   'feedback.correct': 'Benar (+{n} poin)',
@@ -389,9 +403,32 @@ export const id = {
   'map.view.satelliteHint': 'Citra asli dari udara',
   'map.view.blueprint': 'Cetak Biru',
   'map.view.blueprintHint': 'Latar terang, garis tegas',
+  'map.view.globe': 'Globe 3D',
+  'map.view.globeHint': 'Bola dunia, klik negara',
   'map.zoomIn': 'Perbesar',
   'map.zoomOut': 'Perkecil',
   'map.resetCamera': 'Kembalikan tampilan',
+
+  // ── Mode rantai jarak ─────────────────────────────────────────
+  'chain.title': 'Tebak Targetnya',
+  'chain.target': 'Target',
+  'chain.subtitle': 'Satu target rahasia, tebak sampai kena.',
+  'chain.hint': 'Klik sebuah wilayah — makin hijau artinya makin dekat ke target.',
+  'chain.blocked': 'Mode rantai belum tersedia untuk cakupan campuran.',
+  'chain.guesses': '{n} tebakan',
+  'chain.solved.in': 'dalam {n} tebakan',
+  'chain.solved.target': 'Targetnya {name}.',
+  'chain.again': 'Main lagi',
+  'chain.home': 'Kembali ke menu',
+  'chain.rank.perfect': 'Sempurna',
+  'chain.rank.great': 'Luar biasa',
+  'chain.rank.good': 'Bagus',
+  'chain.rank.ok': 'Lumayan',
+
+  // ── Tautan dukungan ──────────────────────────────────────────
+  'support.github': 'Kode sumber di GitHub',
+  'support.contributors': 'Kontributor',
+  'support.donate': 'Dukung lewat donasi',
   // ── Pesan kesalahan data ────────────────────────────────────
   'error.loadFailed': 'Gagal memuat data peta.',
 } as const

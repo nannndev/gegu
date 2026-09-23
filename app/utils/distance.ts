@@ -62,6 +62,48 @@ export function nearMissPoints(fullPoints: number, km: number, limitKm: number):
 }
 
 /**
+ * Diagonal kotak pembatas sebuah koleksi, dalam km — dipakai sebagai skala
+ * "sejauh apa mungkin meleset" di mode rantai jarak. Untuk dunia nilainya
+ * mendekati setengah keliling bumi; untuk satu negara sekelas diagonalnya.
+ */
+export function collectionMaxKm(collection: { features: Array<{ geometry?: { coordinates?: unknown } | null }> }): number {
+  let minLat = 90
+  let maxLat = -90
+  let minLng = 180
+  let maxLng = -180
+
+  const visit = (c: unknown): void => {
+    if (Array.isArray(c)) {
+      if (c.length === 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+        const lng = c[0] as number
+        const lat = c[1] as number
+        minLat = Math.min(minLat, lat)
+        maxLat = Math.max(maxLat, lat)
+        minLng = Math.min(minLng, lng)
+        maxLng = Math.max(maxLng, lng)
+      }
+      else {
+        for (const x of c) visit(x)
+      }
+    }
+  }
+
+  for (const f of collection.features) visit(f.geometry?.coordinates)
+  if (minLat > maxLat || minLng > maxLng) return 0
+  return haversineKm({ lat: minLat, lng: minLng }, { lat: maxLat, lng: maxLng })
+}
+
+/**
+ * Warna panas-dingin untuk tebakan rantai jarak. `t` di rentang [0, 1]:
+ * 0 = terdekat (hijau), 1 = terjauh (merah), lewat kuning di tengah.
+ */
+export function chainHeatColor(t: number): string {
+  const clamped = Math.min(1, Math.max(0, t))
+  const hue = 120 * (1 - clamped)
+  return `hsl(${hue} 65% 45%)`
+}
+
+/**
  * Jarak sebagai teks pendek. Satuannya sama di kedua bahasa; yang berbeda
  * cuma pemisah ribuan, jadi `locale` diteruskan ke `Intl` alih-alih menaruh
  * angka jadinya di kamus.

@@ -61,6 +61,11 @@ export function useScopeLabel() {
         ? t('scope.itProvinces')
         : t('scope.itProvincesFiltered', { region: regionFilter })
     }
+    if (scope === 'de-states') {
+      return regionFilter === 'all'
+        ? t('scope.deStates')
+        : t('scope.deStatesFiltered', { region: regionFilter })
+    }
     if (scope === 'id-provinces') {
       return regionFilter === 'all'
         ? t('scope.idProvinces')
@@ -93,6 +98,7 @@ export function useScopeLabel() {
     if (scope === 'my-states') return t('unit.negeri')
     if (scope === 'jp-prefectures') return t('unit.prefecture')
     if (scope === 'it-provinces') return t('unit.provincia')
+    if (scope === 'de-states') return t('unit.bundesland')
     if (scope === 'id-provinces') return t('unit.province')
     if (scope === 'id-kabupaten') return t('unit.kabupaten')
     if (scope === 'id-mixed') return t('unit.region')

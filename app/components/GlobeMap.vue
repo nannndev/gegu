@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RegionCollection, RegionItem } from '~/types/game'
+import type { RegionItem } from '~/types/game'
 import type { RegionMark } from '~/composables/useLeafletMap'
 
 const emit = defineEmits<{
@@ -9,125 +9,44 @@ const emit = defineEmits<{
 }>()
 
 const game = useGameStore()
-const {
-  collection,
-  worldContext,
-  localContext,
-  loadKecamatanCity,
-  loadRegionSet,
-} = useGeoData()
-const { mode: viewMode, setMode } = useMapViewMode()
+const { collection, worldContext } = useGeoData()
 const { isDark } = useTheme()
+const { setMode } = useMapViewMode()
 const { t } = useI18n()
 
 const container = ref<HTMLElement | null>(null)
 
-/**
- * Mode campuran mengganti level tiap ronde, jadi koleksi yang digambar tidak
- * bisa memakai `collection` global — poligon provinsi dan kecamatan akan
- * saling menimpa. Koleksi khusus mode ini disimpan sendiri dan ditukar
- * mengikuti level target ronde berjalan.
- */
-const isMixed = computed(() => game.datasetScope === 'id-mixed')
-const mixedCollection = ref<RegionCollection | null>(null)
-
-/** Scope efektif untuk styling: mode campuran memakai gaya level aktifnya. */
-const scope = computed(() => {
-  if (!isMixed.value) return game.datasetScope
-  const level = game.currentTarget?.level
-  if (level === 'district') return 'id-kecamatan'
-  if (level === 'country') return 'id-kabupaten'
-  return 'id-provinces'
-})
-
-const activeCollection = computed(() => (isMixed.value ? mixedCollection.value : collection.value))
-
-/**
- * Id target yang koleksinya sudah selesai dimuat. Induk memakai ini untuk
- * menunda penggambaran ronde: memuat koleksi itu async, jadi tanpa penanda
- * ini `mark()` dan framing bisa berjalan sebelum layer-nya ada.
- */
-const mixedReadyFor = ref<string | null>(null)
-
-async function syncMixedCollection() {
-  const target = game.currentTarget
-  if (!isMixed.value || !target) return
-
-  mixedReadyFor.value = null
-  let next: RegionCollection
-  if (target.level === 'district' && target.cityId) {
-    next = await loadKecamatanCity(target.cityId)
-  }
-  else if (target.level === 'country') {
-    next = await loadRegionSet('province', 'id-kabupaten')
-  }
-  else {
-    next = await loadRegionSet('province', 'id-provinces')
-  }
-
-  // Ronde bisa sudah berganti selama await; jangan timpa koleksi yang lebih baru.
-  if (game.currentTarget?.id !== target.id) return
-  mixedCollection.value = next
-  // Tunggu satu tick supaya layer Leaflet sudah dibangun dari koleksi baru.
-  await nextTick()
-  mixedReadyFor.value = target.id
-}
-
-watch(() => game.currentTarget?.id, syncMixedCollection, { immediate: true })
-
-/** Siap digambar: mode biasa selalu siap, mode campuran menunggu koleksinya. */
-const roundReady = computed(() =>
-  !isMixed.value || mixedReadyFor.value === game.currentTarget?.id,
-)
-
-const activePoolIds = computed(() => {
-  // Mode campuran: koleksi yang dimuat berisi seluruh wilayah di level itu,
-  // tapi hanya yang ada di pool sesi ini yang boleh diklik.
-  if (game.pool && game.pool.length) {
-    return new Set(game.pool.map(p => p.id))
-  }
-  return null
-})
+// Globe hanya dipasang di cakupan dunia; `worldContext` jadi cadangan kalau
+// `collection` sempat null saat mount (seharusnya sudah terisi oleh play/chain).
+const activeCollection = computed(() => collection.value ?? worldContext.value)
 
 const hardcore = computed(() => game.isHardcore)
-
-/**
- * Hardcore Mode B: hanya wilayah soal yang digambar, mengambang di kanvas
- * kosong. Di Mode A ini harus null — pemain masih perlu melihat kandidat
- * lain untuk punya sesuatu yang bisa diklik.
- */
 const soloTargetId = computed(() =>
   hardcore.value && game.mode === 'B' ? game.currentTarget?.id ?? null : null,
 )
-
 const targetId = computed(() => game.currentTarget?.id ?? null)
-/** Sorotan petunjuk; hanya Mode A yang mengisinya. */
+const activePoolIds = computed(() =>
+  game.pool?.length ? new Set(game.pool.map(p => p.id)) : null,
+)
 const spotlightIds = computed(() =>
   game.spotlightIds.length ? new Set(game.spotlightIds) : null,
 )
 
-const map = useLeafletMap(container, activeCollection, {
+const map = useGlobeMap(container, activeCollection, {
   onRegionClick: (item, distanceKm) => emit('pick', item, distanceKm),
   onMissClick: () => emit('miss'),
-  scope,
-  worldContext,
-  localContext,
-  activePoolIds,
-  viewMode,
+  targetId,
   isDark,
   hardcore,
   soloTargetId,
-  targetId,
+  activePoolIds,
   spotlightIds,
 })
 
-const canvasColor = computed(() => mapTheme(viewMode.value, isDark.value).canvas)
-
-// Globe hanya tersedia di cakupan dunia; kalau mode 3D tertinggal dari sesi
-// sebelumnya dan pemain masuk cakupan lain, kembalikan ke peta 2D.
-watch(() => [game.datasetScope, viewMode.value] as const, ([scope, mode]) => {
-  if (scope !== 'world' && mode === 'globe') setMode('vector')
-}, { immediate: true })
+// WebGL tidak tersedia / modul gagal dimuat → kembali ke peta 2D.
+watch(map.failed, (f) => {
+  if (f) setMode('vector')
+})
 
 watch(map.ready, (v) => {
   if (v) emit('ready')
@@ -145,7 +64,6 @@ function resetView() {
   map.resetView()
 }
 
-// Parent controls highlight, zoom, and interactions
 defineExpose({
   mark: (id: string, kind: RegionMark) => map.mark(id, kind),
   heat: (id: string, t: number) => map.heat(id, t),
@@ -158,18 +76,13 @@ defineExpose({
   zoomOut,
   setInteractive: (v: boolean) => { map.interactive.value = v },
   invalidate: () => map.invalidate(),
-  roundReady,
+  roundReady: true,
 })
 </script>
 
 <template>
   <div class="relative h-full w-full select-none">
-    <div
-      ref="container"
-      class="h-full w-full cursor-crosshair transition-colors"
-      :data-view="viewMode"
-      :style="{ '--map-canvas': canvasColor }"
-    />
+    <div ref="container" class="h-full w-full cursor-crosshair" />
 
     <!-- Loading State -->
     <Transition
@@ -178,7 +91,7 @@ defineExpose({
       leave-to-class="opacity-0"
     >
       <div
-        v-if="!map.ready.value"
+        v-if="!map.ready.value && !map.failed.value"
         class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-50/80 dark:bg-slate-950/75 backdrop-blur-sm text-xs"
       >
         <div class="h-6 w-6 rounded-full border-2 border-sky-500/20 border-t-sky-500 dark:border-t-sky-400 animate-spin" />
@@ -187,7 +100,7 @@ defineExpose({
     </Transition>
 
     <!-- Pemilih mode tampilan peta (kiri bawah) -->
-    <MapViewPicker v-if="map.ready.value" :allow-globe="game.datasetScope === 'world'" />
+    <MapViewPicker v-if="map.ready.value" :allow-globe="true" />
 
     <!--
       Kontrol zoom hilang saat kamera dikunci: tombol yang terlihat tapi tidak

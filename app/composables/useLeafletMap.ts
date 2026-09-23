@@ -386,6 +386,27 @@ export function useLeafletMap(
     ;(layer as unknown as { bringToFront: () => void }).bringToFront()
   }
 
+  /**
+   * Warnai satu wilayah dengan gradasi panas-dingin untuk mode rantai jarak.
+   * `t` di [0,1]: 0 = hijau (dekat), 1 = merah (jauh). Berbeda dari `mark`
+   * yang cuma punya tiga warna tetap — di sini tiap tebakan diwarnai sesuai
+   * jaraknya, sehingga peta berangsur jadi peta panas.
+   */
+  function heat(id: string, t: number) {
+    const layer = layerById.get(id)
+    if (!layer) return
+    const clamped = Math.min(1, Math.max(0, t))
+    const hue = 120 * (1 - clamped)
+    marked.add(id)
+    styleFor(layer, {
+      fillColor: `hsl(${hue} 65% 45%)`,
+      fillOpacity: 0.9,
+      color: `hsl(${hue} 65% 30%)`,
+      weight: 1.5,
+    })
+    ;(layer as unknown as { bringToFront: () => void }).bringToFront()
+  }
+
   function resetStyles() {
     marked.clear()
     markKindById.clear()
@@ -600,5 +621,5 @@ export function useLeafletMap(
     ready.value = false
   })
 
-  return { ready, interactive, cameraLocked: hardcore, mark, resetStyles, fitRegion, fitPool, fitCollection, fitSameLevel, resetView, zoomIn, zoomOut, invalidate }
+  return { ready, interactive, cameraLocked: hardcore, mark, heat, resetStyles, fitRegion, fitPool, fitCollection, fitSameLevel, resetView, zoomIn, zoomOut, invalidate }
 }

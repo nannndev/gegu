@@ -2,7 +2,7 @@ import type { MessageKey } from '~/i18n/id'
 import type { PathOptions } from 'leaflet'
 
 /** Mode tampilan peta yang bisa dipilih pemain. */
-export type MapViewMode = 'vector' | 'terrain' | 'satellite' | 'blueprint'
+export type MapViewMode = 'vector' | 'terrain' | 'satellite' | 'blueprint' | 'globe'
 
 /** Termasuk varian internal yang dipilih otomatis mengikuti tema aplikasi. */
 export type MapThemeKey = MapViewMode | 'vector-light'
@@ -52,21 +52,26 @@ const MARK_ON_TILES: MapTheme['mark'] = {
   target: { fillColor: '#0284c7', fillOpacity: 0.55, color: '#e0f2fe', weight: 3.5 },
 }
 
+/** Default: vektor gelap modern bernuansa midnight slate & electric sky — paling kontras & cool. */
+const VECTOR_THEME: MapTheme = {
+  canvas: '#080b11',
+  tiles: null,
+  flagWorld: true,
+  context: { fillColor: '#0c1017', fillOpacity: 0.9, color: '#1e293b', weight: 0.75 },
+  contextLand: { fillColor: '#0f172a', fillOpacity: 0.92, color: '#334155', weight: 0.9 },
+  baseWorld: { fillColor: '#0f172a', fillOpacity: 0.96, color: '#334155', weight: 0.85 },
+  baseId: { fillColor: '#0f172a', fillOpacity: 0.96, color: '#0ea5e9', weight: 1.2 },
+  activeLocal: { fillColor: '#1e293b', fillOpacity: 0.96, color: '#38bdf8', weight: 2 },
+  contextLocal: { fillColor: '#080b11', fillOpacity: 0.8, color: '#1e293b', weight: 0.75 },
+  hover: { fillColor: '#0369a1', fillOpacity: 0.95, color: '#38bdf8', weight: 2.5 },
+  mark: MARK_VIVID,
+}
+
 const THEMES: Record<MapThemeKey, MapTheme> = {
-  /** Default: vektor gelap modern bernuansa midnight slate & electric sky — paling kontras & cool. */
-  vector: {
-    canvas: '#080b11',
-    tiles: null,
-    flagWorld: true,
-    context: { fillColor: '#0c1017', fillOpacity: 0.9, color: '#1e293b', weight: 0.75 },
-    contextLand: { fillColor: '#0f172a', fillOpacity: 0.92, color: '#334155', weight: 0.9 },
-    baseWorld: { fillColor: '#0f172a', fillOpacity: 0.96, color: '#334155', weight: 0.85 },
-    baseId: { fillColor: '#0f172a', fillOpacity: 0.96, color: '#0ea5e9', weight: 1.2 },
-    activeLocal: { fillColor: '#1e293b', fillOpacity: 0.96, color: '#38bdf8', weight: 2 },
-    contextLocal: { fillColor: '#080b11', fillOpacity: 0.8, color: '#1e293b', weight: 0.75 },
-    hover: { fillColor: '#0369a1', fillOpacity: 0.95, color: '#38bdf8', weight: 2.5 },
-    mark: MARK_VIVID,
-  },
+  vector: VECTOR_THEME,
+  // Globe tidak memakai MapTheme (paletnya di useGlobeMap); ini cuma
+  // placeholder supaya Record<MapThemeKey, …> tetap lengkap.
+  globe: VECTOR_THEME,
 
   /**
    * Padanan terang dari mode vektor. Tidak bisa dipilih pemain — dipakai
@@ -163,6 +168,7 @@ export const MAP_VIEW_MODES: {
   { id: 'terrain', icon: '⛰', labelKey: 'map.view.terrain', hintKey: 'map.view.terrainHint' },
   { id: 'satellite', icon: '🛰', labelKey: 'map.view.satellite', hintKey: 'map.view.satelliteHint' },
   { id: 'blueprint', icon: '⬡', labelKey: 'map.view.blueprint', hintKey: 'map.view.blueprintHint' },
+  { id: 'globe', icon: '🌐', labelKey: 'map.view.globe', hintKey: 'map.view.globeHint' },
 ]
 
 /**

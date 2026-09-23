@@ -40,6 +40,7 @@ const SCOPE_ACCENT = {
   malaysia: { iso: 'MY', ambient: 'bg-ambient-malaysia' },
   japan: { iso: 'JP', ambient: 'bg-ambient-japan' },
   italy: { iso: 'IT', ambient: 'bg-ambient-italy' },
+  germany: { iso: 'DE', ambient: 'bg-ambient-germany' },
 } as const
 
 /**
@@ -53,6 +54,7 @@ const SCOPE_CHIPS = [
   { key: 'malaysia' as const, icon: '🇲🇾', accent: 'amber' },
   { key: 'japan' as const, icon: '🇯🇵', accent: 'rose' },
   { key: 'italy' as const, icon: '🇮🇹', accent: 'emerald' },
+  { key: 'germany' as const, icon: '🇩🇪', accent: 'red' },
 ] as const
 
 /** Nama kunci i18n untuk judul & deskripsi tiap scope. */
@@ -63,6 +65,7 @@ const SCOPE_I18N_MAP: Record<string, { title: string, desc: string }> = {
   malaysia: { title: 'setup.scope.my.title', desc: 'setup.scope.my.desc' },
   japan: { title: 'setup.scope.jp.title', desc: 'setup.scope.jp.desc' },
   italy: { title: 'setup.scope.it.title', desc: 'setup.scope.it.desc' },
+  germany: { title: 'setup.scope.de.title', desc: 'setup.scope.de.desc' },
 }
 
 const activeChip = computed(() => SCOPE_CHIPS.find(c => c.key === setup.primaryScope.value)!)
@@ -162,6 +165,7 @@ const REGION_FILTER_TEXT = {
   'my-states': { label: 'setup.filter.myRegion', search: 'setup.filter.myRegionSearch', all: 'setup.filter.allMyRegions' },
   'jp-prefectures': { label: 'setup.filter.jpRegion', search: 'setup.filter.jpRegionSearch', all: 'setup.filter.allJpRegions' },
   'it-provinces': { label: 'setup.filter.itRegion', search: 'setup.filter.itRegionSearch', all: 'setup.filter.allItRegions' },
+  'de-states': { label: 'setup.filter.deRegion', search: 'setup.filter.deRegionSearch', all: 'setup.filter.allDeRegions' },
   'id-provinces': { label: 'setup.filter.island', search: 'setup.filter.islandSearch', all: 'setup.filter.allProvinces' },
   'world': { label: 'setup.filter.continent', search: 'setup.filter.continentSearch', all: 'setup.filter.allContinents' },
 } as const
@@ -225,8 +229,17 @@ watch(setup.roundOptions, (options) => {
 /** Rekor untuk cakupan yang sedang dipilih. */
 const scopeRecord = computed(() => statsForScope(stats.value, setup.scopeKey.value))
 
+/** Mode rantai belum didukung di cakupan campuran (koleksinya dimuat per level). */
+const chainBlocked = computed(() =>
+  setup.selectedMode.value === 'C' && setup.activeScope.value === 'id-mixed',
+)
+
 const canStart = computed(() =>
-  !pending.value && !setup.mixedPending.value && setup.poolSize.value > 0 && !error.value,
+  !pending.value
+  && !setup.mixedPending.value
+  && setup.poolSize.value > 0
+  && !error.value
+  && !chainBlocked.value,
 )
 
 // ── Tantangan harian ──────────────────────────────────────────
@@ -271,6 +284,18 @@ async function start(isDaily = false) {
   if (!pool.length) return
 
   setup.persist()
+
+  if (setup.selectedMode.value === 'C') {
+    game.startChain({
+      scope: setup.activeScope.value,
+      pool,
+      scopeKey: setup.scopeKey.value,
+      scopeParts: setup.scopeParts.value,
+    })
+    navigateTo('/chain')
+    return
+  }
+
   game.startGame({
     mode: setup.selectedMode.value,
     pool,
@@ -319,10 +344,12 @@ onBeforeUnmount(() => {
       menembus. Highlight-nya mengikuti negara/wilayah yang sedang dipilih.
     -->
     <div class="pointer-events-none fixed inset-0 overflow-hidden">
-      <WorldMapBackdrop
+      <GlobeBackdrop
         :collection="worldContext"
         :highlight-iso="backdropIso"
       />
+      <!-- Bintik latar: mengisi ruang kosong di sekitar globe. -->
+      <div class="backdrop-stars" aria-hidden="true" />
       <!-- Vignette: menggelapkan tepi supaya teks di tengah tetap kontras. -->
       <div class="backdrop-vignette absolute inset-0" />
       <div
@@ -369,6 +396,7 @@ onBeforeUnmount(() => {
 
           <LanguageToggle />
           <ThemeToggle />
+          <SupportLinks />
         </div>
       </div>
     </header>
@@ -400,6 +428,7 @@ onBeforeUnmount(() => {
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇲🇾 {{ t('home.chip.negeri') }}</span>
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇯🇵 {{ t('home.chip.prefecture') }}</span>
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇹 {{ t('home.chip.provincia') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇩🇪 {{ t('home.chip.bundesland') }}</span>
           </div>
         </div>
 
@@ -868,6 +897,7 @@ onBeforeUnmount(() => {
                 v-for="m in [
                   { key: 'A' as const, title: t('setup.mode.a.title'), desc: t('setup.mode.a.desc') },
                   { key: 'B' as const, title: t('setup.mode.b.title'), desc: t('setup.mode.b.desc') },
+                  { key: 'C' as const, title: t('setup.mode.c.title'), desc: t('setup.mode.c.desc') },
                 ]"
                 :key="m.key"
                 type="button"
@@ -887,8 +917,11 @@ onBeforeUnmount(() => {
                         <circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" />
                         <line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" />
                       </svg>
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg v-else-if="m.key === 'B'" xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
+                      </svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" />
                       </svg>
                     </div>
                     <div class="min-w-0 text-left">
@@ -911,7 +944,7 @@ onBeforeUnmount(() => {
           </section>
 
           <!-- STEP 3: Sesi -->
-          <section class="step-card menu-rise p-5 sm:p-6" style="animation-delay: 120ms" aria-labelledby="session-title">
+          <section v-if="setup.selectedMode.value !== 'C'" class="step-card menu-rise p-5 sm:p-6" style="animation-delay: 120ms" aria-labelledby="session-title">
             <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">3</span>
               <div>
@@ -1054,6 +1087,19 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
+          <!-- STEP 3 (mode rantai): panel sesi diganti catatan singkat -->
+          <section v-if="setup.selectedMode.value === 'C'" class="step-card menu-rise p-5 sm:p-6" style="animation-delay: 120ms" aria-labelledby="chain-title">
+            <div class="mb-4 flex items-center gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 font-mono text-xs font-bold text-sky-600 dark:text-sky-400">3</span>
+              <div>
+                <h2 id="chain-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('chain.title') }}</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('chain.subtitle') }}</p>
+              </div>
+            </div>
+            <p class="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ t('chain.hint') }}</p>
+            <p v-if="chainBlocked" class="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-700 dark:text-amber-400">{{ t('chain.blocked') }}</p>
+          </section>
+
           <!-- Rekor cakupan ini -->
           <section
             v-if="scopeRecord.gamesPlayed > 0"
@@ -1137,21 +1183,30 @@ onBeforeUnmount(() => {
                   ☠️ {{ t('setup.difficulty.hardcore.title') }}
                 </span>
               </div>
-              <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
-              <div class="flex items-center gap-1.5">
-                <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.rounds') }}</dt>
-                <dd class="font-mono font-semibold text-slate-900 dark:text-white">
-                  {{ setup.effectiveRounds.value }}
-                  <span class="text-slate-400 dark:text-slate-500">/ {{ setup.poolSize.value }} {{ setup.unitLabel.value }}</span>
-                </dd>
-              </div>
-              <span class="hidden text-slate-300 dark:text-slate-700 sm:inline" aria-hidden="true">•</span>
-              <div class="hidden items-center gap-1.5 sm:flex">
-                <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.time') }}</dt>
-                <dd class="font-semibold" :class="setup.effectiveTimer.value ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
-                  {{ setup.effectiveTimer.value ? t('common.seconds', { n: setup.roundSeconds.value }) : t('common.relax') }}
-                </dd>
-              </div>
+              <template v-if="setup.selectedMode.value !== 'C'">
+                <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
+                <div class="flex items-center gap-1.5">
+                  <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.rounds') }}</dt>
+                  <dd class="font-mono font-semibold text-slate-900 dark:text-white">
+                    {{ setup.effectiveRounds.value }}
+                    <span class="text-slate-400 dark:text-slate-500">/ {{ setup.poolSize.value }} {{ setup.unitLabel.value }}</span>
+                  </dd>
+                </div>
+                <span class="hidden text-slate-300 dark:text-slate-700 sm:inline" aria-hidden="true">•</span>
+                <div class="hidden items-center gap-1.5 sm:flex">
+                  <dt class="text-slate-500 dark:text-slate-400">{{ t('launch.time') }}</dt>
+                  <dd class="font-semibold" :class="setup.effectiveTimer.value ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'">
+                    {{ setup.effectiveTimer.value ? t('common.seconds', { n: setup.roundSeconds.value }) : t('common.relax') }}
+                  </dd>
+                </div>
+              </template>
+              <template v-else>
+                <span class="text-slate-300 dark:text-slate-700" aria-hidden="true">•</span>
+                <div class="flex items-center gap-1.5">
+                  <dt class="text-slate-500 dark:text-slate-400">{{ t('chain.target') }}</dt>
+                  <dd class="font-mono font-semibold text-slate-900 dark:text-white">1 / {{ setup.poolSize.value }} {{ setup.unitLabel.value }}</dd>
+                </div>
+              </template>
             </dl>
           </div>
 

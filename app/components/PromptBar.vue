@@ -73,6 +73,7 @@ const challengeBadge = computed(() => {
   if (game.datasetScope === 'my-states') return t('prompt.badge.myStates')
   if (game.datasetScope === 'jp-prefectures') return t('prompt.badge.jpPrefectures')
   if (game.datasetScope === 'it-provinces') return t('prompt.badge.itProvinces')
+  if (game.datasetScope === 'de-states') return t('prompt.badge.deStates')
   return formatScope({
     scope: game.datasetScope,
     provinceName: game.provinceName,
@@ -115,6 +116,7 @@ const scopeDotClass = computed(() => {
   if (game.datasetScope.startsWith('my')) return 'bg-amber-500'
   if (game.datasetScope.startsWith('jp')) return 'bg-rose-400'
   if (game.datasetScope.startsWith('it')) return 'bg-emerald-500'
+  if (game.datasetScope.startsWith('de')) return 'bg-red-500'
   return 'bg-rose-500'
 })
 
@@ -127,6 +129,7 @@ const promptFlag = computed(() => {
   if (game.datasetScope.startsWith('my')) return '🇲🇾'
   if (game.datasetScope.startsWith('jp')) return '🇯🇵'
   if (game.datasetScope.startsWith('it')) return '🇮🇹'
+  if (game.datasetScope.startsWith('de')) return '🇩🇪'
   return '🇮🇩'
 })
 
@@ -140,6 +143,7 @@ const modeAInstruction = computed(() => {
   if (promptScope.value === 'my-states') return t('prompt.a.myStates', { name })
   if (promptScope.value === 'jp-prefectures') return t('prompt.a.jpPrefectures', { name })
   if (promptScope.value === 'it-provinces') return t('prompt.a.itProvinces', { name })
+  if (promptScope.value === 'de-states') return t('prompt.a.deStates', { name })
   return t('prompt.a.world')
 })
 
@@ -163,6 +167,7 @@ const modeBQuestion = computed(() => {
   if (promptScope.value === 'my-states') return t('prompt.b.myStates')
   if (promptScope.value === 'jp-prefectures') return t('prompt.b.jpPrefectures')
   if (promptScope.value === 'it-provinces') return t('prompt.b.itProvinces')
+  if (promptScope.value === 'de-states') return t('prompt.b.deStates')
   if (promptScope.value === 'us-county') {
     return t('prompt.b.usCounty', {
       state: game.stateName || t('prompt.b.stateFallback'),

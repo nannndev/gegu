@@ -81,6 +81,12 @@ const JP_BASE = { country: 'Japan', center: [37.5, 138] as [number, number], zoo
 /** Kamera default Italia: seluruh semenanjung plus Sisilia & Sardinia. */
 const IT_BASE = { country: 'Italy', center: [42.5, 12.5] as [number, number], zoom: 5, minZoom: 4 }
 
+/**
+ * Kamera default Jerman. Negaranya kompak, jadi nilai ini cuma titik awal —
+ * seperti Italia, kameranya difit ke isi koleksi (`local`) saat peta dimuat.
+ */
+const DE_BASE = { country: 'Germany', center: [51.1, 10.4] as [number, number], zoom: 5, minZoom: 4 }
+
 const PROFILES: Record<DatasetScope, ScopeProfile> = {
   'world': WORLD,
 
@@ -208,6 +214,25 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
      * 9 km. 90 km berarti kira-kira "satu sampai dua provinsi meleset".
      */
     nearMissKm: 90,
+  },
+
+  'de-states': {
+    ...DE_BASE,
+    maxZoom: 11,
+    // Sama seperti Italia: koleksinya menutupi seluruh negara, tapi kamera
+    // difit ke isi koleksi supaya framingnya tepat di tiap rasio layar.
+    local: true,
+    // Denmark, Polandia, Ceko, Austria, Swiss, Prancis, dan Benelux jadi
+    // patokan posisi; tanpa itu Jerman tampak mengambang.
+    countryBackdrop: true,
+    fitRegionMaxZoom: 9,
+    fitPoolMaxZoom: 11,
+    /**
+     * Jarak antar negara bagian bertetangga: median 91 km, terdekat 28 km
+     * (Berlin–Brandenburg), terjauh 178 km (Bayern–Baden-Württemberg).
+     * 180 km berarti kira-kira "satu sampai dua negara bagian meleset".
+     */
+    nearMissKm: 180,
   },
 }
 

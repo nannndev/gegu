@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import type { ScopeParts } from '~/composables/useScopeLabel'
-import type { Difficulty, Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
+import type { ChainGuess, Difficulty, Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 import { recordSession } from '~/utils/stats'
 import { saveDailyResult } from '~/utils/daily'
 import { nearMissPoints } from '~/utils/distance'
@@ -101,6 +101,8 @@ export const useGameStore = defineStore('game', () => {
   const lastAnswerId = ref<string | null>(null)
   const feedback = ref<Feedback | null>(null)
   const history = ref<RoundResult[]>([])
+  /** Tebakan mode rantai jarak, urut dari tebakan pertama. */
+  const chainGuesses = ref<ChainGuess[]>([])
   const secondsLeft = ref(ROUND_SECONDS)
 
   /** Sisa jatah petunjuk sesi ini. */
@@ -128,6 +130,8 @@ export const useGameStore = defineStore('game', () => {
       ? Math.round((correctCount.value / history.value.length) * 100)
       : 0,
   )
+  /** Banyak tebakan yang sudah dipakai di mode rantai jarak. */
+  const chainGuessCount = computed(() => chainGuesses.value.length)
   const isHardcore = computed(() => difficulty.value === 'hardcore')
   /** Panjang ronde yang berlaku di sesi ini. */
   const roundSeconds = computed(() => secondsFor(difficulty.value))
@@ -179,6 +183,7 @@ export const useGameStore = defineStore('game', () => {
     eliminatedIds.value = []
     revealedRegion.value = null
     spotlightIds.value = []
+    chainGuesses.value = []
   }
 
   /**
@@ -436,6 +441,46 @@ export const useGameStore = defineStore('game', () => {
     return true
   }
 
+  /**
+   * Mulai sesi rantai jarak: satu target rahasia, tebak berulang sampai kena.
+   * Tidak ada ronde, timer, petunjuk, atau kesulitan — seluruh sesinya cuma
+   * "tebak → jarak → tebak lagi".
+   */
+  function startChain(options: {
+    scope: DatasetScope
+    pool: RegionItem[]
+    scopeKey?: string
+    scopeParts?: ScopeParts
+  }) {
+    difficulty.value = 'normal'
+    resetGame()
+    mode.value = 'C'
+    datasetScope.value = options.scope
+    pool.value = options.pool
+    scopeKey.value = options.scopeKey ?? options.scope
+    scopeParts.value = options.scopeParts ?? null
+    timerEnabled.value = false
+    hintsLeft.value = 0
+    currentTarget.value = pool.value[Math.floor(Math.random() * pool.value.length)] ?? null
+    if (currentTarget.value) phase.value = 'playing'
+  }
+
+  /** Catat satu tebakan rantai jarak; tebakan yang kena menandai sesi selesai. */
+  function submitChainGuess(item: RegionItem, distanceKm?: number) {
+    const target = currentTarget.value
+    if (phase.value !== 'playing' || !target) return
+    chainGuesses.value.push({ item, distanceKm: distanceKm ?? 0 })
+    if (item.id === target.id) phase.value = 'finished'
+  }
+
+  /** Mulai ulang dengan target acak baru dari pool yang sama. */
+  function restartChain() {
+    if (!pool.value.length) return
+    chainGuesses.value = []
+    currentTarget.value = pool.value[Math.floor(Math.random() * pool.value.length)] ?? null
+    if (currentTarget.value) phase.value = 'playing'
+  }
+
   return {
     mode,
     datasetScope,
@@ -463,10 +508,12 @@ export const useGameStore = defineStore('game', () => {
     lastAnswerId,
     feedback,
     history,
+    chainGuesses,
     secondsLeft,
     isLastRound,
     correctCount,
     accuracy,
+    chainGuessCount,
     nextPoints,
     hintsLeft,
     hintUsedThisRound,
@@ -482,6 +529,9 @@ export const useGameStore = defineStore('game', () => {
     submitAnswer,
     useHint,
     startDrill,
+    startChain,
+    submitChainGuess,
+    restartChain,
     resetGame,
     tick,
   }

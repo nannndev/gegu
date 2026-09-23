@@ -1,7 +1,10 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 
-/** Mode permainan. A = cari di peta, B = tebak nama dari outline. */
-export type GameMode = 'A' | 'B'
+/**
+ * Mode permainan. A = cari di peta, B = tebak nama dari outline,
+ * C = rantai jarak: tebak target, dikasih tahu seberapa jauh tebakannya.
+ */
+export type GameMode = 'A' | 'B' | 'C'
 
 export type DatasetScope =
   | 'world'
@@ -14,6 +17,7 @@ export type DatasetScope =
   | 'my-states'
   | 'jp-prefectures'
   | 'it-provinces'
+  | 'de-states'
 
 /**
  * Tingkat kesulitan. `hardcore` melucuti semua petunjuk selain bentuk wilayah
@@ -65,6 +69,13 @@ export interface RegionItem {
   cityId?: string
   /** State asal item county, supaya file-nya bisa dimuat ulang. */
   stateId?: string
+}
+
+/** Satu tebakan di mode rantai jarak (C). */
+export interface ChainGuess {
+  item: RegionItem
+  /** Jarak pusat wilayah yang ditebak ke target, km. */
+  distanceKm: number
 }
 
 /** Hasil satu ronde, untuk hitung akurasi di result screen. */

@@ -6,6 +6,10 @@ const game = useGameStore()
 const { load } = useGeoData()
 const { playCorrect, playNear, playWrong, playTick } = useAudio()
 const { t } = useI18n()
+const { mode: viewMode } = useMapViewMode()
+
+/** Globe 3D hanya tersedia di cakupan dunia. */
+const isGlobe = computed(() => viewMode.value === 'globe' && game.datasetScope === 'world')
 
 const mapRef = ref<{
   mark: (id: string, kind: 'correct' | 'wrong' | 'target') => void
@@ -201,7 +205,8 @@ function confirmQuit() {
 
 <template>
   <main class="relative h-dvh w-full overflow-hidden select-none">
-    <MapView ref="mapRef" @pick="onPick" @miss="onMiss" @ready="onMapReady" />
+    <MapView v-if="!isGlobe" ref="mapRef" @pick="onPick" @miss="onMiss" @ready="onMapReady" />
+    <GlobeMap v-else ref="mapRef" @pick="onPick" @miss="onMiss" @ready="onMapReady" />
 
     <!-- Top Navigation HUD Bar -->
     <div class="pointer-events-none absolute inset-x-0 top-0 z-[1100] flex items-start justify-between gap-3 p-3 sm:p-4">
