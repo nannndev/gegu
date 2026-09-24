@@ -270,6 +270,23 @@ export const id = {
   'hint.tooltip': 'Pakai petunjuk — poin ronde ini jadi separuh',
 
   // ── Pintasan papan ketik ────────────────────────────────────
+  // ── Panduan pertama kali ────────────────────────────────────
+  'onboarding.eyebrow': 'Cara main · {n}/{total}',
+  'onboarding.skip': 'Lewati',
+  'onboarding.open': 'Cara main?',
+  'onboarding.next': 'Lanjut',
+  'onboarding.back': 'Kembali',
+  'onboarding.done': 'Siap main',
+  'onboarding.try': 'Coba mode ini',
+  'onboarding.goto': 'Ke langkah {n}',
+  'onboarding.a.title': 'Tunjuk di peta',
+  'onboarding.a.prompt': 'Di mana Bandung?',
+  'onboarding.a.body': 'Kami sebut namanya, kamu klik wilayahnya di peta. Makin cepat benar, makin besar poinnya.',
+  'onboarding.b.title': 'Tebak namanya',
+  'onboarding.b.body': 'Satu wilayah disorot di peta — pilih namanya dari 4 opsi. Tekan A–D atau 1–4 kalau malas klik.',
+  'onboarding.c.title': 'Rantai Jarak',
+  'onboarding.c.body': 'Ada satu target rahasia. Klik wilayah mana saja — warnanya makin hijau kalau makin dekat. Tebak terus sampai kena, sesedikit mungkin.',
+
   'shortcut.title': 'Pintasan papan ketik',
   'shortcut.close': 'Tutup',
   'shortcut.choice': 'Pilih jawaban A–D',
@@ -431,6 +448,34 @@ export const id = {
   'support.donate': 'Dukung lewat donasi',
   // ── Pesan kesalahan data ────────────────────────────────────
   'error.loadFailed': 'Gagal memuat data peta.',
+  // ── Tantangan, penguasaan, tinjau ronde ─────────────────────
+  'challenge.title': 'Ada yang nantang kamu!',
+  'challenge.titleScore': 'Temanmu dapat {score} poin. Bisa kalahkan?',
+  'challenge.accept': 'Terima tantangan',
+  'challenge.dismiss': 'Nanti aja',
+  'challenge.invalid': 'Tautan tantangannya rusak atau terpotong. Minta kirim ulang, ya.',
+  'mastery.title': 'Wilayah yang sudah hafal',
+  'mastery.count': '{n}/{total}',
+  'mastery.aria': '{mastered} dikuasai, {learning} sedang dipelajari, dari {total} wilayah',
+  'mastery.mastered': 'Dikuasai',
+  'mastery.learning': 'Sedang dipelajari',
+  'mastery.hint': 'Benar 2× berturut-turut tanpa petunjuk = dikuasai. Yang sering salah bakal lebih sering keluar.',
+  'result.mastered': '+{n} dikuasai',
+  'result.challenge.share': 'Tantang teman',
+  'result.challenge.message': 'Aku dapat {score} poin di GeoGuesser. Soalnya sama persis — berani lawan? {url}',
+  'result.challenge.win': 'Kamu menang! Skor temanmu cuma {score}.',
+  'result.challenge.lose': 'Belum menang — temanmu dapat {score}. Coba lagi?',
+  'result.challenge.tie': 'Seri! Sama-sama {score} poin.',
+  'review.tapHint': 'Ketuk baris untuk lihat di peta',
+  'review.aria': 'Peta: target {target}, tebakanmu {answer}',
+  'review.ariaTarget': 'Peta: target {target}',
+  'review.unavailable': 'Petanya tidak tersedia untuk ronde ini.',
+  'review.legend.target': 'Jawaban benar',
+  'review.legend.answer': 'Tebakanmu',
+  'result.share.button': 'Bagikan',
+  'result.challenge.shareDesc': 'Tautan dengan soal yang sama persis',
+  'result.copyDesc': 'Teks skor + kotak hasil untuk chat',
+  'mastery.chip': '{n}/{total} hafal',
 } as const
 
 export type MessageKey = keyof typeof id

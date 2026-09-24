@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
+import type { PersistedSetup } from '~/composables/useGameSetup'
 import type { ScopeParts } from '~/composables/useScopeLabel'
+import { newSeed } from '~/utils/challenge'
 import type { ChainGuess, Difficulty, Feedback, GameMode, RegionItem, RoundResult, DatasetScope } from '~/types/game'
 import { recordSession } from '~/utils/stats'
-import { saveDailyResult } from '~/utils/daily'
+import { rng, saveDailyResult, seedFrom } from '~/utils/daily'
+import { masteryWeights, recordMastery } from '~/utils/mastery'
 import { nearMissPoints } from '~/utils/distance'
 import { applyHintPenalty, hintBudget, hintKindFor, spotlightFor } from '~/utils/hints'
 import { scopeProfile } from '~/utils/scopeProfile'
@@ -36,10 +39,10 @@ export function secondsFor(difficulty: Difficulty): number {
   return difficulty === 'hardcore' ? HARDCORE_SECONDS : ROUND_SECONDS
 }
 
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(arr: T[], random: () => number = Math.random): T[] {
   const out = [...arr]
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(random() * (i + 1))
     ;[out[i], out[j]] = [out[j]!, out[i]!]
   }
   return out
@@ -67,6 +70,17 @@ interface StartOptions {
   scopeParts?: ScopeParts
   /** Kunci tanggal kalau sesi ini berasal dari tantangan harian. */
   daily?: string
+  /**
+   * Seed opsi pilihan ganda & coretan 50:50. Tanpa ini sesi dapat seed baru;
+   * dua sesi dengan seed dan urutan target yang sama mendapat opsi yang sama.
+   */
+  seed?: string
+  /** Urutan target yang dipaksakan — dipakai tautan tantangan. */
+  targetIds?: string[]
+  /** Skor si penantang, kalau sesinya datang dari tautan tantangan. */
+  challengerScore?: number
+  /** Konfigurasi menu sesi ini, untuk dikemas ke tautan tantangan. */
+  shareSetup?: PersistedSetup
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -82,6 +96,21 @@ export const useGameStore = defineStore('game', () => {
   const scopeKey = ref('world')
   const scopeParts = ref<ScopeParts | null>(null)
   const dailyKey = ref('')
+  const seed = ref('')
+  const challengerScore = ref<number | null>(null)
+  const shareSetup = ref<PersistedSetup | null>(null)
+  /** Target tautan tantangan, urut per ronde. Kosong di sesi biasa. */
+  const forcedTargets = ref<string[]>([])
+  /** Wilayah yang baru dikuasai di sesi yang barusan selesai. */
+  const newlyMastered = ref(0)
+  /**
+   * Sumber acak opsi & coretan. Diturunkan ulang per ronde dari seed sesi:
+   * kalau satu aliran dipakai sepanjang sesi, pemain yang memakai 50:50 di
+   * ronde 2 menggeser semua opsi sesudahnya dan tantangannya tidak lagi sama.
+   */
+  let random: () => number = Math.random
+  /** Bobot undian dari riwayat penguasaan; kosong di sesi tantangan. */
+  let weights = new Map<string, number>()
 
   const score = ref(0)
   const streak = ref(0)
@@ -195,6 +224,10 @@ export const useGameStore = defineStore('game', () => {
    */
   function pickTarget(): RegionItem | null {
     if (!pool.value.length) return null
+    if (forcedTargets.value.length) {
+      const id = forcedTargets.value[currentRound.value]
+      return pool.value.find(i => i.id === id) ?? null
+    }
     let remaining = pool.value.filter(i => !usedIds.value.includes(i.id))
     if (!remaining.length) {
       usedIds.value = []
@@ -210,7 +243,24 @@ export const useGameStore = defineStore('game', () => {
       }
     }
 
-    return remaining[Math.floor(Math.random() * remaining.length)] ?? null
+    return weightedPick(remaining)
+  }
+
+  /**
+   * Undi satu item. Tanpa bobot (sesi ber-seed, atau belum ada riwayat)
+   * semua item berpeluang sama; dengan bobot, wilayah yang sering salah
+   * lebih sering keluar — itu yang membuat latihan terasa terarah.
+   */
+  function weightedPick(items: RegionItem[]): RegionItem | null {
+    if (!items.length) return null
+    if (!weights.size) return items[Math.floor(Math.random() * items.length)] ?? null
+    const total = items.reduce((sum, i) => sum + (weights.get(i.id) ?? 1), 0)
+    let roll = Math.random() * total
+    for (const item of items) {
+      roll -= weights.get(item.id) ?? 1
+      if (roll < 0) return item
+    }
+    return items[items.length - 1] ?? null
   }
 
   /** 1 jawaban benar + 3 distraktor, diutamakan dari region yang sama. */
@@ -224,10 +274,10 @@ export const useGameStore = defineStore('game', () => {
       if (sameLevel.length >= CHOICE_COUNT - 1) others = sameLevel
     }
 
-    const sameRegion = shuffle(others.filter(i => i.region === target.region))
-    const rest = shuffle(others.filter(i => i.region !== target.region))
+    const sameRegion = shuffle(others.filter(i => i.region === target.region), random)
+    const rest = shuffle(others.filter(i => i.region !== target.region), random)
     const distractors = [...sameRegion, ...rest].slice(0, CHOICE_COUNT - 1)
-    return shuffle([target, ...distractors])
+    return shuffle([target, ...distractors], random)
   }
 
   function finishGame() {
@@ -236,6 +286,8 @@ export const useGameStore = defineStore('game', () => {
     const alreadyFinished = phase.value === 'finished'
     phase.value = 'finished'
     if (alreadyFinished || !history.value.length) return
+
+    newlyMastered.value = recordMastery(datasetScope.value, history.value)
 
     recordSession({
       scopeKey: scopeKey.value || datasetScope.value,
@@ -270,8 +322,16 @@ export const useGameStore = defineStore('game', () => {
     scopeKey.value = options.scopeKey ?? options.scope ?? 'world'
     scopeParts.value = options.scopeParts ?? null
     dailyKey.value = options.daily ?? ''
+    seed.value = options.seed || newSeed()
+    challengerScore.value = options.challengerScore ?? null
+    shareSetup.value = options.shareSetup ?? null
+    newlyMastered.value = 0
+    forcedTargets.value = options.targetIds?.filter(id => options.pool.some(i => i.id === id)) ?? []
+    // Target tantangan sudah ditentukan si pengirim; riwayat pribadi tidak
+    // boleh ikut membelokkan undiannya.
+    weights = forcedTargets.value.length ? new Map() : masteryWeights(datasetScope.value, options.pool)
     pool.value = options.pool
-    totalRounds.value = Math.min(preferredRounds.value, options.pool.length)
+    totalRounds.value = forcedTargets.value.length || Math.min(preferredRounds.value, options.pool.length)
     // Jatah dihitung dari panjang sesi yang benar-benar berlaku, bukan dari
     // `preferredRounds` — sesi 20 ronde di pool 6 wilayah cuma jalan 6 ronde.
     hintsLeft.value = hintBudget(totalRounds.value, difficulty.value)
@@ -290,6 +350,7 @@ export const useGameStore = defineStore('game', () => {
     }
     currentRound.value += 1
     usedIds.value.push(target.id)
+    random = rng(seedFrom(`${seed.value}:${currentRound.value}`))
     currentTarget.value = target
     choices.value = mode.value === 'B' ? buildChoices(target) : []
     lastAnswerId.value = null
@@ -319,7 +380,9 @@ export const useGameStore = defineStore('game', () => {
       // Undi mana yang dicoret, jangan ambil dua yang pertama: urutan opsi
       // tetap selama ronde, jadi pilihan yang tidak diacak membuat posisi
       // jawaban benar bisa ditebak dari pola coretannya.
-      eliminatedIds.value = shuffle(wrong).slice(0, 2).map(c => c.id)
+      // Aliran sendiri, supaya memakai petunjuk tidak menggeser undian lain.
+      const hintRandom = rng(seedFrom(`${seed.value}:${currentRound.value}:hint`))
+      eliminatedIds.value = shuffle(wrong, hintRandom).slice(0, 2).map(c => c.id)
     }
     else {
       const ids = spotlightFor(target, pool.value)
@@ -437,6 +500,7 @@ export const useGameStore = defineStore('game', () => {
       stateName: stateName.value,
       scopeKey: scopeKey.value,
       scopeParts: scopeParts.value ?? undefined,
+      shareSetup: shareSetup.value ?? undefined,
     })
     return true
   }
@@ -495,6 +559,10 @@ export const useGameStore = defineStore('game', () => {
     scopeKey,
     scopeParts,
     dailyKey,
+    seed,
+    challengerScore,
+    shareSetup,
+    newlyMastered,
     score,
     streak,
     bestStreak,

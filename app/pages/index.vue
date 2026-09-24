@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { SearchOption } from '~/components/SearchSelect.vue'
+import type { GameMode } from '~/types/game'
 import { dailyChallenge, dailyResult } from '~/utils/daily'
 import { loadStats, statsForScope, type StatsBlob } from '~/utils/stats'
 import { HARDCORE_SECONDS } from '~/stores/game'
+import { CHALLENGE_PARAM, decodeChallenge, type Challenge } from '~/utils/challenge'
+import { masterySummary, type MasterySummary } from '~/utils/mastery'
 
 const {
   regions,
@@ -229,6 +232,21 @@ watch(setup.roundOptions, (options) => {
 /** Rekor untuk cakupan yang sedang dipilih. */
 const scopeRecord = computed(() => statsForScope(stats.value, setup.scopeKey.value))
 
+/**
+ * Penguasaan wilayah di cakupan terpilih. Mode campuran tidak ditampilkan:
+ * pool-nya diundi dari kota acak, jadi "x dari y" tidak punya penyebut tetap.
+ */
+const mastery = ref<MasterySummary | null>(null)
+function refreshMastery() {
+  if (!import.meta.client || setup.activeScope.value === 'id-mixed') {
+    mastery.value = null
+    return
+  }
+  const pool = itemsInRegion(setup.regionFilter.value)
+  mastery.value = pool.length ? masterySummary(setup.activeScope.value, pool) : null
+}
+watch([() => setup.activeScope.value, () => setup.regionFilter.value, items], refreshMastery)
+
 /** Mode rantai belum didukung di cakupan campuran (koleksinya dimuat per level). */
 const chainBlocked = computed(() =>
   setup.selectedMode.value === 'C' && setup.activeScope.value === 'id-mixed',
@@ -276,14 +294,54 @@ async function startDaily() {
   await start(true)
 }
 
-async function start(isDaily = false) {
+// ── Tautan tantangan ─────────────────────────────────────────
+const route = useRoute()
+const challenge = ref<Challenge | null>(null)
+const challengeInvalid = ref(false)
+
+/** Buka tautan tantangan: terapkan setup si pengirim ke panel menu. */
+async function openChallenge() {
+  const code = route.query[CHALLENGE_PARAM]
+  if (typeof code !== 'string' || !code) return false
+  const decoded = decodeChallenge(code)
+  if (!decoded) {
+    challengeInvalid.value = true
+    return false
+  }
+  await setup.apply(decoded.setup)
+  challenge.value = decoded
+  return true
+}
+
+/**
+ * Tolak tantangan: kembalikan setup milik pemain sendiri. Tautan tadi sudah
+ * menimpa panel menu dengan setup si pengirim, dan tanpa ini pemain harus
+ * memuat ulang halaman untuk mendapatkan pilihannya kembali.
+ */
+async function dismissChallenge() {
+  playClick()
+  challenge.value = null
+  challengeInvalid.value = false
+  await navigateTo({ path: '/', query: {} }, { replace: true })
+  await setup.restore()
+  refreshMastery()
+}
+
+async function startChallenge() {
+  const c = challenge.value
+  if (!c) return
+  await start(false, c)
+}
+
+async function start(isDaily = false, fromChallenge: Challenge | null = null) {
   if (!canStart.value) return
   playClick()
 
   const pool = await setup.buildPool()
   if (!pool.length) return
 
-  setup.persist()
+  // Setup tantangan milik si pengirim; jangan timpa setup tersimpan pemain.
+  if (!fromChallenge) setup.persist()
 
   if (setup.selectedMode.value === 'C') {
     game.startChain({
@@ -310,13 +368,30 @@ async function start(isDaily = false) {
     scopeKey: setup.scopeKey.value,
     scopeParts: setup.scopeParts.value,
     daily: isDaily ? daily.key : '',
+    seed: fromChallenge?.seed,
+    targetIds: fromChallenge?.targets,
+    challengerScore: fromChallenge?.score,
+    shareSetup: setup.snapshot(),
   })
   navigateTo({ path: '/play', query: { mode: setup.selectedMode.value } })
 }
 
 const INTERACTIVE_TAGS = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SUMMARY', 'A']
 
+/**
+ * Panduan mode untuk pengunjung pertama. Tidak muncul untuk pemain lama
+ * (sudah pernah main sebelum fitur ini ada) atau yang datang lewat tautan
+ * tantangan — mereka sudah punya konteks dan tinggal menekan "Terima".
+ */
+const showOnboarding = ref(false)
+
+function onOnboardingPick(mode: GameMode) {
+  setup.setMode(mode)
+  document.getElementById('mode-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 function onKeydown(e: KeyboardEvent) {
+  if (showOnboarding.value) return
   if (e.key !== 'Enter' || !canStart.value) return
   const el = e.target as HTMLElement | null
   if (el && (INTERACTIVE_TAGS.includes(el.tagName) || el.isContentEditable)) return
@@ -327,7 +402,13 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(async () => {
   stats.value = loadStats()
   dailyDone.value = dailyResult(daily.key)
-  await setup.restore()
+  const fromChallenge = await openChallenge()
+  if (!fromChallenge) await setup.restore()
+  refreshMastery()
+  if (!fromChallenge && !isOnboarded()) {
+    if (stats.value.overall.gamesPlayed > 0) markOnboarded()
+    else showOnboarding.value = true
+  }
   window.addEventListener('keydown', onKeydown)
 })
 
@@ -375,7 +456,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             class="focusable flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
@@ -403,6 +484,49 @@ onBeforeUnmount(() => {
 
     <!-- ── Main ───────────────────────────────────────────────── -->
     <main class="relative z-10 mx-auto w-full max-w-[1400px] flex-1 px-4 pb-40 pt-6 sm:px-6 sm:py-8 sm:pb-36 lg:px-10">
+      <!-- Tautan tantangan dari teman -->
+      <section
+        v-if="challenge"
+        class="step-card menu-rise mb-6 flex flex-col gap-4 border-violet-500/40 p-5 sm:flex-row sm:items-center sm:justify-between"
+        aria-labelledby="challenge-title"
+      >
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="shrink-0 text-2xl" aria-hidden="true">⚔️</span>
+          <div class="min-w-0">
+            <h2 id="challenge-title" class="text-sm font-bold text-slate-900 dark:text-white">
+              {{ challenge.score !== undefined ? t('challenge.titleScore', { score: challenge.score }) : t('challenge.title') }}
+            </h2>
+            <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+              {{ setup.modeLabel.value }} · {{ setup.scopeLabel.value }} · {{ t('common.rounds', { n: challenge.targets.length }) }}
+            </p>
+          </div>
+        </div>
+        <div class="flex shrink-0 gap-2">
+          <button
+            type="button"
+            :disabled="!canStart"
+            class="focusable inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-violet-600 px-5 text-xs font-bold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+            @click="startChallenge"
+          >
+            {{ t('challenge.accept') }}
+          </button>
+          <button
+            type="button"
+            class="focusable inline-flex h-10 items-center justify-center rounded-xl px-4 text-xs font-semibold text-slate-500 transition hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            @click="dismissChallenge"
+          >
+            {{ t('challenge.dismiss') }}
+          </button>
+        </div>
+      </section>
+      <p
+        v-else-if="challengeInvalid"
+        class="mb-6 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400"
+        role="status"
+      >
+        {{ t('challenge.invalid') }}
+      </p>
+
       <!-- Hero + Daily Challenge -->
       <div class="menu-rise mb-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div class="max-w-3xl">
@@ -539,7 +663,21 @@ onBeforeUnmount(() => {
           <div class="mt-3 flex items-center gap-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 px-4 py-2.5 transition-all duration-200">
             <span class="text-lg" aria-hidden="true">{{ activeChip.icon }}</span>
             <div class="min-w-0 flex-1">
-              <span class="block text-xs font-bold text-slate-900 dark:text-white">{{ t(activeScopeI18n.title) }}</span>
+              <span class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t(activeScopeI18n.title) }}</span>
+                <!--
+                  Penguasaan juga dipasang di sini, bukan cuma di kartunya: di
+                  ponsel kartu itu ada jauh di bawah, sementara baris ini
+                  selalu terlihat saat pemain memilih wilayah.
+                -->
+                <a
+                  v-if="mastery && mastery.mastered"
+                  href="#mastery-title"
+                  class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 transition hover:bg-emerald-500/20 dark:text-emerald-400"
+                >
+                  ⭐ {{ t('mastery.chip', { n: mastery.mastered, total: mastery.total }) }}
+                </a>
+              </span>
               <span class="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ t(activeScopeI18n.desc) }}</span>
             </div>
             <span class="hidden shrink-0 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400 sm:inline-flex">
@@ -567,7 +705,7 @@ onBeforeUnmount(() => {
 
           <!-- Sub-opsi Indonesia -->
           <div v-if="setup.primaryScope.value === 'indonesia'" class="mt-5 space-y-4">
-            <div class="seg-track grid grid-cols-2 sm:grid-cols-4" role="radiogroup" :aria-label="t('setup.level.group')">
+            <div class="seg-track !grid grid-cols-2 sm:grid-cols-4" role="radiogroup" :aria-label="t('setup.level.group')">
               <button
                 v-for="lvl in [
                   { key: 'provinces' as const, icon: '🏛️', label: t('setup.level.provinces') },
@@ -789,7 +927,7 @@ onBeforeUnmount(() => {
 
           <!-- Sub-opsi Amerika Serikat -->
           <div v-if="setup.primaryScope.value === 'us'" class="mt-5 space-y-4">
-            <div class="seg-track grid grid-cols-2" role="radiogroup" :aria-label="t('setup.level.usGroup')">
+            <div class="seg-track !grid grid-cols-2" role="radiogroup" :aria-label="t('setup.level.usGroup')">
               <button
                 v-for="lvl in [
                   { key: 'states' as const, icon: '🏛️', label: t('setup.level.usStates') },
@@ -890,6 +1028,13 @@ onBeforeUnmount(() => {
                 <h2 id="mode-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('setup.mode.title') }}</h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('setup.mode.subtitle') }}</p>
               </div>
+              <button
+                type="button"
+                class="focusable ml-auto shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-sky-600 dark:text-sky-400 transition hover:bg-sky-500/10"
+                @click="showOnboarding = true"
+              >
+                {{ t('onboarding.open') }}
+              </button>
             </div>
 
             <div class="grid gap-3" role="radiogroup" :aria-label="t('setup.mode.group')">
@@ -1100,6 +1245,34 @@ onBeforeUnmount(() => {
             <p v-if="chainBlocked" class="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-700 dark:text-amber-400">{{ t('chain.blocked') }}</p>
           </section>
 
+          <!-- Penguasaan wilayah di cakupan ini -->
+          <section
+            v-if="mastery && (mastery.mastered || mastery.learning)"
+            class="step-card menu-rise p-5"
+            style="animation-delay: 140ms"
+            aria-labelledby="mastery-title"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <h2 id="mastery-title" class="text-sm font-bold text-slate-900 dark:text-white">{{ t('mastery.title') }}</h2>
+              <span class="shrink-0 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {{ t('mastery.count', { n: mastery.mastered, total: mastery.total }) }}
+              </span>
+            </div>
+            <div
+              class="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70"
+              role="img"
+              :aria-label="t('mastery.aria', { mastered: mastery.mastered, learning: mastery.learning, total: mastery.total })"
+            >
+              <div class="h-full bg-emerald-500 transition-all duration-500" :style="{ width: `${(mastery.mastered / mastery.total) * 100}%` }" />
+              <div class="h-full bg-amber-400/80 transition-all duration-500" :style="{ width: `${(mastery.learning / mastery.total) * 100}%` }" />
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500" />{{ t('mastery.mastered') }}</span>
+              <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-amber-400" />{{ t('mastery.learning') }}</span>
+            </div>
+            <p class="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ t('mastery.hint') }}</p>
+          </section>
+
           <!-- Rekor cakupan ini -->
           <section
             v-if="scopeRecord.gamesPlayed > 0"
@@ -1230,5 +1403,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <OnboardingTour v-model="showOnboarding" @pick="onOnboardingPick" />
   </div>
 </template>

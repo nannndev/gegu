@@ -4,7 +4,7 @@
  */
 
 /** PRNG deterministik (mulberry32) supaya undian harian bisa direproduksi. */
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6D2B79F5) >>> 0
@@ -22,7 +22,7 @@ export function todayKey(d = new Date()): string {
   return `${y}-${m}-${day}`
 }
 
-function seedFrom(key: string): number {
+export function seedFrom(key: string): number {
   let h = 2166136261
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i)

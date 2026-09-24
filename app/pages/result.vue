@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { isoToFlag, getPerformanceRank } from '~/utils/geo'
 import { formatDistance } from '~/utils/distance'
+import { challengeUrl } from '~/utils/challenge'
+import type { RegionCollection, RoundResult } from '~/types/game'
 
 const game = useGameStore()
 const { playFanfare, playClick } = useAudio()
@@ -20,6 +22,115 @@ const rank = computed(() => {
   }
 })
 const copiedToast = ref(false)
+const linkToast = ref(false)
+
+/**
+ * Salin skor dan tautan tantangan digabung ke satu tombol Bagikan. Lima
+ * tombol sejajar membuat "Main lagi" — aksi yang paling sering dipakai —
+ * tenggelam di antara yang lain.
+ */
+const shareOpen = ref(false)
+const shareMenu = ref<HTMLElement | null>(null)
+
+function toggleShare() {
+  playClick()
+  shareOpen.value = !shareOpen.value
+}
+
+function onDocPointer(e: PointerEvent) {
+  if (shareOpen.value && shareMenu.value && !shareMenu.value.contains(e.target as Node)) {
+    shareOpen.value = false
+  }
+}
+
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') shareOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointer)
+  document.addEventListener('keydown', onDocKey)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointer)
+  document.removeEventListener('keydown', onDocKey)
+})
+
+// ── Tinjau ronde ──────────────────────────────────────────────
+const { collection, loadRegionSet, loadKecamatanCity } = useGeoData()
+
+/** Ronde yang peta mininya sedang dibuka; `null` = semua tertutup. */
+const reviewRound = ref<number | null>(null)
+const reviewCollection = ref<RegionCollection | null>(null)
+
+/**
+ * Koleksi yang memuat target ronde itu. Mode biasa cukup memakai koleksi
+ * yang tadi dimuat halaman main; mode campuran harus memuat level yang
+ * sesuai, karena tiap ronde bisa berasal dari dataset yang berbeda.
+ */
+async function collectionFor(row: RoundResult): Promise<RegionCollection | null> {
+  if (game.datasetScope !== 'id-mixed') return collection.value
+  if (row.level === 'district') {
+    const cityId = game.pool.find(i => i.id === row.targetId)?.cityId
+    return cityId ? loadKecamatanCity(cityId) : null
+  }
+  return loadRegionSet('province', row.level === 'country' ? 'id-kabupaten' : 'id-provinces')
+}
+
+async function toggleReview(row: RoundResult) {
+  playClick()
+  if (reviewRound.value === row.round) {
+    reviewRound.value = null
+    return
+  }
+  reviewRound.value = row.round
+  reviewCollection.value = null
+  const next = await collectionFor(row).catch(() => null)
+  // Pemain bisa sudah membuka baris lain selama koleksi dimuat.
+  if (reviewRound.value === row.round) reviewCollection.value = next
+}
+
+// ── Tautan tantangan ──────────────────────────────────────────
+/** Menang/kalah melawan skor si pengirim tautan. */
+const challengeOutcome = computed(() => {
+  if (game.challengerScore === null) return null
+  if (game.score > game.challengerScore) return 'win'
+  if (game.score < game.challengerScore) return 'lose'
+  return 'tie'
+})
+
+/**
+ * Mode campuran mengundi kotanya saat sesi dimulai, jadi penerima tautan
+ * tidak akan punya pool yang sama — tombolnya disembunyikan di sana.
+ */
+const canChallenge = computed(() => Boolean(game.shareSetup) && game.datasetScope !== 'id-mixed')
+
+async function shareChallenge() {
+  playClick()
+  if (!game.shareSetup || !canChallenge.value) return
+  const url = challengeUrl({
+    setup: game.shareSetup,
+    seed: game.seed,
+    targets: game.history.map(h => h.targetId),
+    score: game.score,
+  })
+  const text = t('result.challenge.message', { score: game.score, url })
+  try {
+    // Lembar bagi bawaan ponsel lebih enak daripada salin-tempel; desktop
+    // umumnya tidak punya, jadi jatuh ke clipboard.
+    if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+      await navigator.share({ text })
+      return
+    }
+    await navigator.clipboard.writeText(text)
+    linkToast.value = true
+    setTimeout(() => {
+      linkToast.value = false
+      shareOpen.value = false
+    }, 1500)
+  }
+  catch {}
+}
 
 // Animate the final score counting up from 0 (skipped for reduced motion).
 const displayedScore = ref(0)
@@ -72,6 +183,7 @@ function playAgain() {
     stateName: game.stateName,
     scopeKey: game.scopeKey,
     scopeParts: game.scopeParts ?? undefined,
+    shareSetup: game.shareSetup ?? undefined,
     // Ulangan tidak dihitung sebagai tantangan harian lagi — hasil harian
     // hanya boleh dicatat sekali per hari.
   })
@@ -174,7 +286,8 @@ async function shareResults() {
       copiedToast.value = true
       setTimeout(() => {
         copiedToast.value = false
-      }, 2500)
+        shareOpen.value = false
+      }, 1500)
     }
   }
   catch {}
@@ -217,6 +330,12 @@ async function shareResults() {
               >
                 {{ t('result.hardcoreBadge') }}
               </span>
+              <span
+                v-if="game.newlyMastered > 0"
+                class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400"
+              >
+                ⭐ {{ t('result.mastered', { n: game.newlyMastered }) }}
+              </span>
               <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
                 {{ game.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short') }} · {{ scopeLabel }}
               </span>
@@ -236,6 +355,20 @@ async function shareResults() {
               {{ displayedScore }}
             </span>
           </div>
+        </div>
+
+        <!-- Hasil duel melawan pengirim tautan -->
+        <div
+          v-if="challengeOutcome"
+          class="mt-6 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold"
+          :class="{
+            'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400': challengeOutcome === 'win',
+            'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400': challengeOutcome === 'lose',
+            'border-slate-300 bg-slate-100/70 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300': challengeOutcome === 'tie',
+          }"
+        >
+          <span aria-hidden="true">{{ challengeOutcome === 'win' ? '🏆' : challengeOutcome === 'lose' ? '⚔️' : '🤝' }}</span>
+          <span>{{ t(`result.challenge.${challengeOutcome}`, { score: game.challengerScore ?? 0 }) }}</span>
         </div>
 
         <!-- Ringkasan per ronde sebagai deret kotak -->
@@ -276,30 +409,48 @@ async function shareResults() {
       <!-- Round Breakdown Table -->
       <div class="raycast-card overflow-hidden rounded-2xl shadow-xl">
         <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-3.5">
-          <h2 class="font-mono text-xs font-bold uppercase tracking-[0.16em] text-slate-900 dark:text-slate-200">
-            {{ t('result.tableTitle') }}
-          </h2>
+          <div>
+            <h2 class="font-mono text-xs font-bold uppercase tracking-[0.16em] text-slate-900 dark:text-slate-200">
+              {{ t('result.tableTitle') }}
+            </h2>
+            <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ t('review.tapHint') }}</p>
+          </div>
           <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ t('common.rounds', { n: game.history.length }) }}</span>
         </div>
 
-        <div class="max-h-64 overflow-y-auto">
+        <div class="max-h-[28rem] overflow-y-auto">
           <table class="w-full text-left text-xs">
-            <thead class="sticky top-0 border-b border-slate-200 dark:border-slate-800 bg-slate-100/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 backdrop-blur">
+            <thead class="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400">
               <tr>
-                <th class="w-12 px-4 py-2.5 font-semibold">#</th>
+                <th class="w-16 px-4 py-2.5 font-semibold">#</th>
                 <th class="px-4 py-2.5 font-semibold">{{ columnHeader }}</th>
                 <th class="px-4 py-2.5 font-semibold">{{ t('result.table.result') }}</th>
                 <th class="px-4 py-2.5 text-right font-semibold">{{ t('result.table.points') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200/60 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+              <template v-for="row in game.history" :key="row.round">
               <tr
-                v-for="row in game.history"
-                :key="row.round"
-                class="transition-colors hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+                class="cursor-pointer transition-colors hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+                :class="reviewRound === row.round && 'bg-slate-100/60 dark:bg-slate-800/40'"
+                tabindex="0"
+                :aria-expanded="reviewRound === row.round"
+                @click="toggleReview(row)"
+                @keydown.enter.prevent="toggleReview(row)"
+                @keydown.space.prevent="toggleReview(row)"
               >
                 <td class="px-4 py-2.5 font-mono text-slate-500 dark:text-slate-400">
-                  {{ row.round }}
+                  <span class="inline-flex items-center gap-1.5">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-3 w-3 shrink-0 transition-transform duration-200"
+                      :class="reviewRound === row.round && 'rotate-90 text-sky-500'"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    {{ row.round }}
+                  </span>
                 </td>
                 <td class="px-4 py-2.5 font-semibold text-slate-900 dark:text-white">
                   <span class="mr-1.5">{{ rowFlag(row.targetIso) }}</span>
@@ -337,10 +488,26 @@ async function shareResults() {
                     </span>
                   </span>
                 </td>
-                <td class="px-4 py-2.5 text-right font-mono font-bold" :class="row.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'">
-                  {{ row.correct ? `+${row.pointsEarned}` : '0' }}
+                <td class="px-4 py-2.5 text-right font-mono font-bold" :class="row.pointsEarned > 0 ? (row.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400') : 'text-slate-400 dark:text-slate-500'">
+                  {{ row.pointsEarned > 0 ? `+${row.pointsEarned}` : '0' }}
                 </td>
               </tr>
+              <tr v-if="reviewRound === row.round">
+                <td colspan="4" class="bg-slate-50/70 px-4 py-3 dark:bg-slate-950/40">
+                  <RoundReview
+                    v-if="reviewCollection"
+                    :collection="reviewCollection"
+                    :target-id="row.targetId"
+                    :answer-id="row.answerId"
+                  />
+                  <div v-else class="h-24 animate-pulse rounded-lg bg-slate-200/60 dark:bg-slate-800/60" />
+                  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500" />{{ t('review.legend.target') }}</span>
+                    <span v-if="row.answerId && !row.correct" class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full border border-dashed border-rose-500 bg-rose-500/40" />{{ t('review.legend.answer') }}</span>
+                  </div>
+                </td>
+              </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -374,13 +541,55 @@ async function shareResults() {
           {{ t('result.drill', { n: game.missedItems.length }) }}
         </button>
 
-        <button
-          type="button"
-          class="inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 sm:w-auto"
-          @click="shareResults"
-        >
-          {{ copiedToast ? t('result.copied') : t('result.copy') }}
-        </button>
+        <div ref="shareMenu" class="relative w-full sm:w-auto">
+          <button
+            type="button"
+            class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 text-xs font-bold text-violet-700 dark:text-violet-300 transition hover:bg-violet-500/25 active:scale-95 sm:w-auto"
+            aria-haspopup="menu"
+            :aria-expanded="shareOpen"
+            @click="toggleShare"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            {{ t('result.share.button') }}
+          </button>
+
+          <Transition name="share-pop">
+            <div
+              v-if="shareOpen"
+              role="menu"
+              class="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:left-auto sm:w-64"
+            >
+              <button
+                v-if="canChallenge"
+                type="button"
+                role="menuitem"
+                class="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-violet-500/10"
+                @click="shareChallenge"
+              >
+                <span class="text-base" aria-hidden="true">⚔️</span>
+                <span class="min-w-0">
+                  <span class="block text-xs font-bold text-slate-900 dark:text-white">{{ linkToast ? t('result.copied') : t('result.challenge.share') }}</span>
+                  <span class="block text-[11px] text-slate-500 dark:text-slate-400">{{ t('result.challenge.shareDesc') }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                @click="shareResults"
+              >
+                <span class="text-base" aria-hidden="true">📋</span>
+                <span class="min-w-0">
+                  <span class="block text-xs font-bold text-slate-900 dark:text-white">{{ copiedToast ? t('result.copied') : t('result.copy') }}</span>
+                  <span class="block text-[11px] text-slate-500 dark:text-slate-400">{{ t('result.copyDesc') }}</span>
+                </span>
+              </button>
+            </div>
+          </Transition>
+        </div>
 
         <button
           type="button"
@@ -393,3 +602,15 @@ async function shareResults() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.share-pop-enter-active,
+.share-pop-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.share-pop-enter-from,
+.share-pop-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+</style>

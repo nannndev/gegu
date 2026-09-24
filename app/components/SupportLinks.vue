@@ -16,13 +16,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div ref="root" class="relative flex shrink-0 items-center gap-2">
+  <div ref="root" class="relative flex shrink-0 items-center gap-1.5 sm:gap-2">
     <!-- GitHub -->
     <a
       :href="GITHUB_URL"
       target="_blank"
       rel="noopener"
-      class="focusable flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+      class="focusable hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 sm:flex"
       :title="t('support.github')"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-600 dark:text-slate-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -35,7 +35,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       :href="CONTRIBUTORS_URL"
       target="_blank"
       rel="noopener"
-      class="focusable flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+      class="focusable hidden h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 sm:flex"
       :title="t('support.contributors')"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-600 dark:text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -72,6 +72,27 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           role="menu"
           class="absolute right-0 top-full z-50 mt-2 w-52 origin-top-right rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 shadow-2xl"
         >
+          <!-- Di layar sempit tombol GitHub & Kontributor disembunyikan dari
+               header supaya tidak meluber; aksesnya dipindah ke sini. -->
+          <div class="sm:hidden">
+            <a
+              role="menuitem"
+              :href="GITHUB_URL"
+              target="_blank"
+              rel="noopener"
+              class="flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+              @click="open = false"
+            >{{ t('support.github') }}</a>
+            <a
+              role="menuitem"
+              :href="CONTRIBUTORS_URL"
+              target="_blank"
+              rel="noopener"
+              class="flex items-center rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+              @click="open = false"
+            >{{ t('support.contributors') }}</a>
+            <div class="mx-2 my-1 h-px bg-slate-200 dark:bg-slate-800" />
+          </div>
           <p class="px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             {{ t('support.donate') }}
           </p>

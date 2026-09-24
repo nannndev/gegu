@@ -15,8 +15,8 @@ export interface MixedLevels {
   kecamatan: boolean
 }
 
-/** Konfigurasi yang diingat antar kunjungan. */
-interface PersistedSetup {
+/** Konfigurasi yang diingat antar kunjungan — dan yang dibawa tautan tantangan. */
+export interface PersistedSetup {
   primaryScope: PrimaryScope
   indonesiaLevel: IndonesiaLevel
   usLevel?: UsLevel
@@ -291,9 +291,8 @@ export function useGameSetup() {
     }
   }
 
-  function persist() {
-    if (!import.meta.client) return
-    const blob: PersistedSetup = {
+  function snapshot(): PersistedSetup {
+    return {
       primaryScope: primaryScope.value,
       indonesiaLevel: indonesiaLevel.value,
       usLevel: usLevel.value,
@@ -306,6 +305,11 @@ export function useGameSetup() {
       cityId: geo.activeKecamatanCity.value?.id ?? '',
       stateId: geo.activeUsCountyState.value?.id ?? '',
     }
+  }
+
+  function persist() {
+    if (!import.meta.client) return
+    const blob = snapshot()
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
     }
@@ -324,8 +328,15 @@ export function useGameSetup() {
       if (raw) saved = JSON.parse(raw) as PersistedSetup
     }
     catch {}
-    if (!saved) return
+    if (saved) await apply(saved)
+  }
 
+  /**
+   * Terapkan konfigurasi ke panel setup. Dipakai untuk memulihkan setup
+   * tersimpan maupun tautan tantangan; setiap nilai divalidasi karena
+   * keduanya datang dari luar kode (localStorage bisa basi, URL bisa diedit).
+   */
+  async function apply(saved: PersistedSetup) {
     if (PRIMARY_SCOPES.includes(saved.primaryScope)) {
       primaryScope.value = saved.primaryScope
     }
@@ -414,5 +425,7 @@ export function useGameSetup() {
     buildPool,
     persist,
     restore,
+    snapshot,
+    apply,
   }
 }
