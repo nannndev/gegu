@@ -148,7 +148,12 @@ const shapes = computed<Shape[]>(() => {
   opacity: 0.38;
 }
 
-:global(.dark) .world-backdrop-shapes {
+/*
+ * Seluruh selektor dibungkus `:global(...)`. Bentuk `:global(.dark) .x`
+ * dikompilasi Vue menjadi `.dark` saja — sisa selektornya dibuang — sehingga
+ * aturan ini dulu meredupkan <html> ke 50% di mode gelap.
+ */
+:global(.dark .world-backdrop-shapes) {
   opacity: 0.5;
 }
 
@@ -159,7 +164,7 @@ const shapes = computed<Shape[]>(() => {
   transition: opacity 0.5s ease;
 }
 
-:global(.dark) .world-backdrop-shapes path {
+:global(.dark .world-backdrop-shapes path) {
   stroke: rgb(255 255 255 / 0.14);
 }
 
