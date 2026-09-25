@@ -495,4 +495,6 @@ export const en: Record<MessageKey, string> = {
   'result.challenge.shareDesc': 'A link with the exact same rounds',
   'result.copyDesc': 'Score text + result squares for chat',
   'mastery.chip': '{n}/{total} known',
+  'journey.title': 'Your route',
+  'journey.hint': 'One dot per round, linked in order. Drag to spin.',
 }

@@ -91,10 +91,13 @@ const quickCities = computed(() => {
 })
 
 const popularMajorCities = computed(() => {
+  // Cocokkan persis ke "Kota X", bukan substring: "Medan" juga cocok dengan
+  // "Sumedang", dan "Bandung" menyeret Kabupaten Bandung & Bandung Barat —
+  // tombolnya lalu tampil dobel dengan label yang sama.
   const targets = ['Surabaya', 'Bandung', 'Medan', 'Denpasar', 'Semarang', 'Makassar']
-  return availableCities.value.filter(c =>
-    targets.some(t => c.city.toLowerCase().includes(t.toLowerCase())),
-  )
+  return targets
+    .map(t => availableCities.value.find(c => c.city === `Kota ${t}`))
+    .filter(c => c !== undefined)
 })
 
 /** Pintasan state AS populer untuk akses 1-klik. */
@@ -478,13 +481,7 @@ onBeforeUnmount(() => {
     <header class="sticky top-0 z-30 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/55 dark:bg-[#080b11]/55 backdrop-blur-xl backdrop-saturate-150">
       <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 via-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20 ring-1 ring-white/20">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-          </div>
+          <img src="/icon.svg" alt="" width="36" height="36" class="h-9 w-9 shrink-0 rounded-xl shadow-md shadow-sky-500/20">
           <div class="min-w-0">
             <span class="font-display block truncate text-base font-black tracking-tight text-slate-900 dark:text-white">GeoGuesser</span>
             <p class="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">{{ t('app.tagline') }}</p>
@@ -593,7 +590,7 @@ onBeforeUnmount(() => {
 
         <!-- Daily challenge card -->
         <section
-          class="step-card overflow-hidden p-5"
+          class="step-card step-card-solid overflow-hidden p-5"
           aria-labelledby="daily-title"
         >
           <div class="flex items-start justify-between gap-3">
@@ -614,8 +611,10 @@ onBeforeUnmount(() => {
           <dl class="mt-4 grid grid-cols-3 gap-2 text-center">
             <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2">
               <dt class="text-[10px] font-bold uppercase text-slate-400">{{ t('daily.col.scope') }}</dt>
-              <dd class="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">
-                {{ dailyScopeLabel }}
+              <!-- Spasi nol-lebar setelah "/" supaya "Cities/Regencies" patah di
+                   garis miring, bukan dipotong "…" atau di tengah kata. -->
+              <dd class="mt-0.5 text-xs font-bold leading-tight text-slate-900 dark:text-white">
+                {{ dailyScopeLabel.replace('/', '/\u200B') }}
               </dd>
             </div>
             <div class="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/50 p-2">
@@ -642,7 +641,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             :disabled="!canStart"
-            class="focusable mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 text-xs font-bold text-amber-700 dark:text-amber-300 transition hover:bg-amber-500/25 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            class="focusable mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            :class="dailyDone
+              ? 'border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
+              : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-orange-600'"
             @click="startDaily"
           >
             {{ dailyDone ? t('daily.replay') : t('daily.play') }}

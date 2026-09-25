@@ -2,8 +2,8 @@
 import type { Locale } from '~/composables/useI18n'
 
 /**
- * Pengalih bahasa ID/EN. Bentuknya menyalin ThemeToggle supaya dua kontrol
- * di header terbaca sebagai satu keluarga.
+ * Pengalih bahasa ID/EN. Tetap segmen dua tombol (bukan satu ikon seperti
+ * ThemeToggle) karena label "ID"/"EN" sendiri sudah menjelaskan pilihannya.
  */
 const { locale, setLocale, t } = useI18n()
 const { playClick } = useAudio()

@@ -222,6 +222,20 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+/*
+ * Kartu yang duduk tepat di atas globe (tantangan harian). Di situ yang
+ * menembus bukan lautan pucat, melainkan benua dengan warna bendera jenuh —
+ * blur saja tidak cukup, kartunya ikut ternoda merah-hijau dan teks kecilnya
+ * tenggelam. Jadi alpha-nya dinaikkan; globe masih samar terlihat di tepi.
+ */
+.step-card.step-card-solid {
+  background-color: rgb(255 255 255 / 0.9);
+}
+
+.dark .step-card.step-card-solid {
+  background-color: rgb(15 23 42 / 0.88);
+}
+
 .step-card:has([aria-expanded='true']) {
   position: relative;
   z-index: 35;

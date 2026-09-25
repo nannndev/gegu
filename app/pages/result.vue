@@ -90,6 +90,9 @@ async function toggleReview(row: RoundResult) {
   if (reviewRound.value === row.round) reviewCollection.value = next
 }
 
+const JOURNEY_SKIP = new Set(['id-kecamatan', 'us-county', 'id-mixed'])
+const showJourney = computed(() => !JOURNEY_SKIP.has(game.datasetScope) && Boolean(collection.value))
+
 // ── Tautan tantangan ──────────────────────────────────────────
 /** Menang/kalah melawan skor si pengirim tautan. */
 const challengeOutcome = computed(() => {
@@ -405,6 +408,17 @@ async function shareResults() {
           </div>
         </div>
       </div>
+
+      <!--
+        Rute sesi di globe 3D. Tidak di kecamatan & county: wilayahnya terlalu
+        kecil, semua titik menumpuk jadi satu di globe. Tidak di mode campuran
+        juga, karena targetnya tersebar di beberapa koleksi sekaligus.
+      -->
+      <JourneyGlobe
+        v-if="showJourney"
+        :collection="collection"
+        :history="game.history"
+      />
 
       <!-- Round Breakdown Table -->
       <div class="raycast-card overflow-hidden rounded-2xl shadow-xl">
