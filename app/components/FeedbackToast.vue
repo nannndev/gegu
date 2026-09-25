@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { isoToFlag } from '~/utils/geo'
+import { regionFact } from '~/utils/regionFacts'
 
 const emit = defineEmits<{ next: [] }>()
 
@@ -29,6 +30,30 @@ const distanceText = computed(() => {
   if (km === undefined) return ''
   return formatDistance(km, locale.value)
 })
+
+const { collection } = useGeoData()
+
+/**
+ * Satu baris fakta tentang jawaban benarnya, supaya ronde yang salah pun
+ * meninggalkan sesuatu untuk diingat. Mode campuran dilewati: koleksinya
+ * dimuat per level di dalam peta, bukan di `collection` global.
+ * `toRaw` karena koleksinya proxy `useState` — membaca ribuan titiknya lewat
+ * proxy membuat layar tersendat tepat saat umpan balik muncul.
+ */
+const fact = computed(() => {
+  const target = game.currentTarget
+  const col = collection.value
+  if (!fb.value || !target || !col || game.datasetScope === 'id-mixed') return null
+  const f = regionFact(toRaw(col), target.id)
+  if (!f) return null
+  const shown = f.neighbors.slice(0, MAX_NEIGHBORS)
+  return {
+    parent: f.parent,
+    neighbors: shown.join(', '),
+    more: f.neighbors.length - shown.length,
+  }
+})
+const MAX_NEIGHBORS = 3
 
 const isLast = computed(() => game.currentRound >= game.totalRounds)
 
@@ -147,6 +172,24 @@ onBeforeUnmount(() => {
             <span>
               {{ t('feedback.answerWas') }} <strong class="text-slate-900 dark:text-white font-semibold">{{ fb.targetName }}</strong> {{ isoToFlag(fb.targetIso) }}.
             </span>
+          </template>
+        </p>
+
+        <!-- Fakta: wilayah induk + tetangga langsungnya. -->
+        <p v-if="fact" class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+          <span class="inline-flex items-center gap-1">
+            <span aria-hidden="true">📍</span>
+            <span class="font-semibold text-slate-600 dark:text-slate-300">{{ fact.parent }}</span>
+          </span>
+          <template v-if="fact.neighbors">
+            <span aria-hidden="true">·</span>
+            <span>
+              {{ t('feedback.borders') }} {{ fact.neighbors }}<template v-if="fact.more"> {{ t('feedback.bordersMore', { n: fact.more }) }}</template>
+            </span>
+          </template>
+          <template v-else>
+            <span aria-hidden="true">·</span>
+            <span>{{ t('feedback.noBorders') }}</span>
           </template>
         </p>
       </div>

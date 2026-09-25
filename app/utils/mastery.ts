@@ -114,3 +114,36 @@ export function masteryWeights(scope: DatasetScope, items: RegionItem[]): Map<st
   }
   return weights
 }
+
+/**
+ * Wilayah yang terakhir kali dijawab salah (run kembali ke nol). Yang sudah
+ * sekali benar tidak ikut — ia sedang di jalur dikuasai, bukan "masih
+ * meleset". Urut dari yang paling sering meleset, jadi latihan pendek pun
+ * menyentuh yang paling bermasalah lebih dulu.
+ *
+ * Id dideduplikasi: beberapa dataset (mis. provinsi pemekaran Papua) punya
+ * fitur yang berbagi id, dan tanpa ini satu wilayah bisa terhitung dua kali.
+ */
+export function weakItems(scope: DatasetScope, items: RegionItem[]): RegionItem[] {
+  const bucket = load()[scope] ?? {}
+  const seen = new Set<string>()
+  return items
+    .filter((item) => {
+      if (seen.has(item.id)) return false
+      seen.add(item.id)
+      const m = bucket[item.id]
+      return Boolean(m?.seen) && m!.run === 0 && m!.correct < m!.seen
+    })
+    .map(item => ({ item, misses: bucket[item.id]!.seen - bucket[item.id]!.correct }))
+    .sort((a, b) => b.misses - a.misses)
+    .map(({ item }) => item)
+}
+
+export type MasteryStatus = 'mastered' | 'learning' | 'new'
+
+/** Status satu wilayah, untuk label di mode belajar. */
+export function masteryStatus(scope: DatasetScope, id: string): MasteryStatus {
+  const m = load()[scope]?.[id]
+  if (isMastered(m)) return 'mastered'
+  return m?.seen ? 'learning' : 'new'
+}

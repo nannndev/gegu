@@ -529,6 +529,29 @@ export const useGameStore = defineStore('game', () => {
     if (currentTarget.value) phase.value = 'playing'
   }
 
+  /**
+   * Mode belajar: peta bebas tanpa soal, skor, atau timer. Pool dan cakupan
+   * tetap diisi karena peta membacanya untuk memilih wilayah yang bisa
+   * diklik; target sengaja kosong supaya tidak ada yang tersorot sebagai soal.
+   */
+  function startStudy(options: {
+    scope: DatasetScope
+    pool: RegionItem[]
+    scopeKey?: string
+    scopeParts?: ScopeParts
+  }) {
+    difficulty.value = 'normal'
+    resetGame()
+    mode.value = 'A'
+    datasetScope.value = options.scope
+    pool.value = options.pool
+    scopeKey.value = options.scopeKey ?? options.scope
+    scopeParts.value = options.scopeParts ?? null
+    timerEnabled.value = false
+    hintsLeft.value = 0
+    if (pool.value.length) phase.value = 'playing'
+  }
+
   /** Catat satu tebakan rantai jarak; tebakan yang kena menandai sesi selesai. */
   function submitChainGuess(item: RegionItem, distanceKm?: number) {
     const target = currentTarget.value
@@ -598,6 +621,7 @@ export const useGameStore = defineStore('game', () => {
     useHint,
     startDrill,
     startChain,
+    startStudy,
     submitChainGuess,
     restartChain,
     resetGame,

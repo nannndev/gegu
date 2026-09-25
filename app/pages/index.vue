@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { SearchOption } from '~/components/SearchSelect.vue'
-import type { GameMode } from '~/types/game'
+import type { GameMode, RegionItem } from '~/types/game'
 import { dailyChallenge, dailyResult } from '~/utils/daily'
 import { loadStats, statsForScope, type StatsBlob } from '~/utils/stats'
 import { HARDCORE_SECONDS } from '~/stores/game'
 import { CHALLENGE_PARAM, decodeChallenge, type Challenge } from '~/utils/challenge'
-import { masterySummary, type MasterySummary } from '~/utils/mastery'
+import { masterySummary, weakItems, type MasterySummary } from '~/utils/mastery'
 
 const {
   regions,
@@ -237,13 +237,18 @@ const scopeRecord = computed(() => statsForScope(stats.value, setup.scopeKey.val
  * pool-nya diundi dari kota acak, jadi "x dari y" tidak punya penyebut tetap.
  */
 const mastery = ref<MasterySummary | null>(null)
+/** Wilayah yang masih sering meleset di cakupan aktif; sumber sesi latihan. */
+const weak = ref<RegionItem[]>([])
+
 function refreshMastery() {
   if (!import.meta.client || setup.activeScope.value === 'id-mixed') {
     mastery.value = null
+    weak.value = []
     return
   }
   const pool = itemsInRegion(setup.regionFilter.value)
   mastery.value = pool.length ? masterySummary(setup.activeScope.value, pool) : null
+  weak.value = pool.length ? weakItems(setup.activeScope.value, pool) : []
 }
 watch([() => setup.activeScope.value, () => setup.regionFilter.value, items], refreshMastery)
 
@@ -333,11 +338,41 @@ async function startChallenge() {
   await start(false, c)
 }
 
-async function start(isDaily = false, fromChallenge: Challenge | null = null) {
+/**
+ * Sesi latihan: hanya wilayah yang belum dikuasai. Mode rantai tidak punya
+ * ronde, jadi latihannya jatuh ke Mode A — mencari letaknya di peta adalah
+ * cara paling langsung menghafal wilayah yang tadi meleset.
+ */
+async function startPractice() {
+  if (!weak.value.length) return
+  if (setup.selectedMode.value === 'C') setup.setMode('A')
+  await start(false, null, weak.value.slice(0, PRACTICE_MAX))
+}
+const PRACTICE_MAX = 15
+
+/** Mode belajar memakai cakupan yang sedang dipilih; mode campuran tidak didukung. */
+const canStudy = computed(() => setup.activeScope.value !== 'id-mixed' && !pending.value)
+
+async function startStudy() {
+  if (!canStudy.value) return
+  playClick()
+  const pool = await setup.buildPool()
+  if (!pool.length) return
+  setup.persist()
+  game.startStudy({
+    scope: setup.activeScope.value,
+    pool,
+    scopeKey: setup.scopeKey.value,
+    scopeParts: setup.scopeParts.value,
+  })
+  navigateTo('/study')
+}
+
+async function start(isDaily = false, fromChallenge: Challenge | null = null, practice: RegionItem[] | null = null) {
   if (!canStart.value) return
   playClick()
 
-  const pool = await setup.buildPool()
+  const pool = practice ?? await setup.buildPool()
   if (!pool.length) return
 
   // Setup tantangan milik si pengirim; jangan timpa setup tersimpan pemain.
@@ -359,7 +394,7 @@ async function start(isDaily = false, fromChallenge: Challenge | null = null) {
     pool,
     regionFilter: setup.regionFilter.value,
     timerEnabled: setup.effectiveTimer.value,
-    roundsCount: setup.selectedRounds.value,
+    roundsCount: practice ? practice.length : setup.selectedRounds.value,
     scope: setup.activeScope.value,
     difficulty: setup.difficulty.value,
     provinceName: setup.activeScope.value === 'id-kabupaten' ? setup.selectedProvince.value : '',
@@ -1271,6 +1306,16 @@ onBeforeUnmount(() => {
               <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-amber-400" />{{ t('mastery.learning') }}</span>
             </div>
             <p class="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ t('mastery.hint') }}</p>
+            <button
+              v-if="weak.length"
+              type="button"
+              class="focusable mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 text-xs font-bold text-amber-700 dark:text-amber-400 transition hover:bg-amber-500/20 active:scale-95 disabled:opacity-40"
+              :disabled="pending"
+              @click="startPractice"
+            >
+              <span aria-hidden="true">🎯</span>
+              {{ t('mastery.practice', { n: Math.min(weak.length, PRACTICE_MAX) }) }}
+            </button>
           </section>
 
           <!-- Rekor cakupan ini -->
@@ -1383,10 +1428,22 @@ onBeforeUnmount(() => {
             </dl>
           </div>
 
+          <div class="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+          <button
+            v-if="setup.activeScope.value !== 'id-mixed'"
+            type="button"
+            :disabled="!canStudy"
+            class="focusable inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-3.5 text-xs font-bold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 disabled:opacity-40"
+            :title="t('study.cta.title')"
+            @click="startStudy"
+          >
+            <span aria-hidden="true">📖</span>
+            <span>{{ t('study.cta') }}</span>
+          </button>
           <button
             type="button"
             :disabled="!canStart"
-            class="focusable launch-pulse group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 sm:w-auto"
+            class="focusable launch-pulse group inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-5 font-display text-sm font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 sm:w-auto"
             @click="start()"
           >
             <span
@@ -1400,6 +1457,7 @@ onBeforeUnmount(() => {
               <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
     </div>

@@ -270,6 +270,23 @@ export const id = {
   'hint.tooltip': 'Pakai petunjuk — poin ronde ini jadi separuh',
 
   // ── Pintasan papan ketik ────────────────────────────────────
+  // ── Mode belajar & latihan ───────────────────────────────────
+  'study.title': 'Mode belajar',
+  'study.cta': 'Belajar',
+  'study.cta.title': 'Jelajahi peta tanpa skor dulu',
+  'study.explored': '{n}/{total} dibuka',
+  'study.search': 'Cari wilayah…',
+  'study.hint': 'Ketuk wilayah mana saja untuk lihat nama & tetangganya. Tanpa skor, tanpa waktu.',
+  'study.neighbors': 'Berbatasan dengan ({n})',
+  'study.noNeighbors': 'Tidak berbatasan darat dengan wilayah lain di peta ini.',
+  'study.status.mastered': '⭐ Dikuasai',
+  'study.status.learning': 'Dipelajari',
+  'study.status.new': 'Belum pernah keluar',
+  'mastery.practice': 'Latih {n} yang masih meleset',
+  'feedback.borders': 'Berbatasan dengan',
+  'feedback.bordersMore': '+{n} lagi',
+  'feedback.noBorders': 'Tidak berbatasan darat',
+
   // ── Panduan pertama kali ────────────────────────────────────
   'onboarding.eyebrow': 'Cara main · {n}/{total}',
   'onboarding.skip': 'Lewati',

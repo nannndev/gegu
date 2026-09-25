@@ -272,6 +272,23 @@ export const en: Record<MessageKey, string> = {
   'hint.tooltip': 'Use a hint — this round pays half',
 
   // ── Keyboard shortcuts ──────────────────────────────────────
+  // ── Study & practice ────────────────────────────────────────
+  'study.title': 'Study mode',
+  'study.cta': 'Study',
+  'study.cta.title': 'Explore the map with no score first',
+  'study.explored': '{n}/{total} explored',
+  'study.search': 'Search a region…',
+  'study.hint': 'Tap any region to see its name and neighbours. No score, no timer.',
+  'study.neighbors': 'Borders ({n})',
+  'study.noNeighbors': 'No land border with any other region on this map.',
+  'study.status.mastered': '⭐ Mastered',
+  'study.status.learning': 'Learning',
+  'study.status.new': 'Not seen yet',
+  'mastery.practice': 'Practise the {n} you keep missing',
+  'feedback.borders': 'Borders',
+  'feedback.bordersMore': '+{n} more',
+  'feedback.noBorders': 'No land borders',
+
   // ── First-time guide ────────────────────────────────────────
   'onboarding.eyebrow': 'How to play · {n}/{total}',
   'onboarding.skip': 'Skip',
