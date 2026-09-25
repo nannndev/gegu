@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="0.55" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <radialGradient id="sphere" cx="0.36" cy="0.32" r="0.8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </radialGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <clipPath id="globe">
+      <circle cx="238" cy="270" r="150"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Globe -->
+  <circle cx="238" cy="270" r="150" fill="url(#sphere)"/>
+  <g clip-path="url(#globe)" fill="#ffffff" fill-opacity="0.9">
+    <!-- Continents, kept chunky so they still read at 32px -->
+    <path d="M120 200c22-30 62-44 96-36 14 3 20 16 12 28-9 13-28 12-36 26-7 12 4 26-6 38-12 14-34 6-44 20-8 11-2 30-16 36-16 6-30-12-34-30-6-28 10-58 28-82z"/>
+    <path d="M262 150c30-4 66 6 88 28 10 10 2 24-12 24-18 0-28 14-24 30 3 14 20 20 18 36-2 18-24 22-34 36-12 18-4 44-22 54-14 8-28-6-30-22-3-22 10-42 2-62-6-16-26-20-28-38-3-22 18-42 42-46z"/>
+    <path d="M300 330c16-8 38-4 48 10 8 12-2 28-16 32-16 4-34-2-40-16-4-10 0-20 8-26z"/>
+  </g>
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="7">
+    <circle cx="238" cy="270" r="150"/>
+    <ellipse cx="238" cy="270" rx="62" ry="150"/>
+    <path d="M92 230h292M92 310h292"/>
+  </g>
+
+  <!-- Map pin dropping onto the globe -->
+  <g transform="translate(330 96)">
+    <ellipse cx="44" cy="176" rx="30" ry="9" fill="#0f172a" fill-opacity="0.28"/>
+    <path d="M44 0C19.7 0 0 19.7 0 44c0 33 44 124 44 124s44-91 44-124C88 19.7 68.3 0 44 0z" fill="url(#pin)" stroke="#ffffff" stroke-width="8" stroke-linejoin="round"/>
+    <circle cx="44" cy="44" r="16" fill="#ffffff"/>
+  </g>
+</svg>

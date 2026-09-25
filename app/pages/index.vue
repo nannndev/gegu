@@ -481,13 +481,7 @@ onBeforeUnmount(() => {
     <header class="sticky top-0 z-30 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/55 dark:bg-[#080b11]/55 backdrop-blur-xl backdrop-saturate-150">
       <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-10">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 via-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20 ring-1 ring-white/20">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-          </div>
+          <img src="/icon.svg" alt="" width="36" height="36" class="h-9 w-9 shrink-0 rounded-xl shadow-md shadow-sky-500/20">
           <div class="min-w-0">
             <span class="font-display block truncate text-base font-black tracking-tight text-slate-900 dark:text-white">GeoGuesser</span>
             <p class="hidden truncate text-[11px] text-slate-500 dark:text-slate-400 sm:block">{{ t('app.tagline') }}</p>
