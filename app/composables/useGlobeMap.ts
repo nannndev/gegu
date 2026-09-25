@@ -12,6 +12,19 @@ const MARK_CAP: Record<MarkKind, string> = {
   target: '#0284c7',
 }
 
+/**
+ * Tanda di atas foto satelit. Sedikit tembus supaya daratan di bawahnya masih
+ * terbaca, tapi cukup pekat untuk jadi satu-satunya warna mencolok di globe.
+ */
+const MARK_FILL: Record<MarkKind, string> = {
+  correct: 'rgba(16, 185, 129, 0.82)',
+  wrong: 'rgba(244, 63, 94, 0.82)',
+  target: 'rgba(56, 189, 248, 0.85)',
+}
+
+/** Foto bumi NASA Blue Marble (domain publik), dari contoh three-globe. */
+const EARTH_TEXTURE = '/textures/earth-blue-marble.jpg'
+
 interface Options {
   onRegionClick?: (item: RegionItem, distanceKm?: number) => void
   onMissClick?: () => void
@@ -46,7 +59,15 @@ function dimHex(hex: string): string {
  * benar/salah/target, heat map rantai, fit kamera, kunci hardcore) punya
  * padanan langsung di globe.gl. Yang sengaja tidak disalin dari `useLeafletMap`
  * adalah ubin foto/relief — globe tidak punya proyeksi datar, jadi mode
- * tampilannya tunggal: bola berisi warna bendera.
+ * tampilannya tunggal.
+ *
+ * Permukaannya foto satelit, negaranya tanpa isi — hanya garis batas. Dulu
+ * tiap negara diisi warna benderanya, dan tanda benar/salah (hijau/merah)
+ * tenggelam di antara ratusan negara yang sudah hijau & merah duluan.
+ * Sekarang tanda jawaban adalah satu-satunya warna pekat di globe.
+ *
+ * Hardcore tetap memakai bola polos: foto satelit memperlihatkan garis pantai
+ * seluruh dunia, dan itu persis petunjuk yang mode itu lucuti.
  */
 export function useGlobeMap(
   container: Ref<HTMLElement | null>,
@@ -60,6 +81,9 @@ export function useGlobeMap(
   const isDark = options.isDark ?? ref(true)
 
   let globe: any = null
+  /** Tekstur foto; null sampai selesai dimuat. */
+  let photoTexture: unknown = null
+  const photoReady = ref(false)
   let features: RegionFeature[] = []
   const centroidByKey = new Map<string, { lat: number, lng: number }>()
   const marked = new Set<string>()
@@ -89,6 +113,28 @@ export function useGlobeMap(
     return `hsl(${hue} 65% 45%)`
   }
 
+  /** Foto satelit aktif: teksturnya sudah ada dan bukan hardcore. */
+  function photo(): boolean {
+    return photoReady.value && !hardcore.value
+  }
+
+  /**
+   * Pasang permukaan globe: foto atau warna laut polos. three-globe
+   * mengosongkan `material.color` begitu teksturnya dimuat, jadi warnanya
+   * dibuat ulang di sini kalau perlu, bukan sekadar di-`set`.
+   */
+  function applySurface() {
+    if (!globe) return
+    const mat = globe.globeMaterial()
+    const usePhoto = photo()
+    mat.map = usePhoto ? photoTexture : null
+    // Di tema gelap fotonya diredam sedikit supaya tidak menyilaukan.
+    const tint = usePhoto ? (isDark.value ? '#c3cbd9' : '#ffffff') : oceanColor()
+    if (mat.color) mat.color.set(tint)
+    else mat.color = mat.emissive.clone().set(tint)
+    mat.needsUpdate = true
+  }
+
   /** Wilayah ini boleh terlihat? Hardcore menyembunyikan yang di luar soal. */
   function isVisible(key: string): boolean {
     if (!hardcore.value) return true
@@ -105,9 +151,17 @@ export function useGlobeMap(
     // hardcore, supaya jawaban benar tetap muncul saat ronde terungkap.
     if (heatById.has(key)) return heatColor(heatById.get(key)!)
     const mark = markKindById.get(key)
-    if (mark) return MARK_CAP[mark]
+    if (mark) return photo() ? MARK_FILL[mark] : MARK_CAP[mark]
 
     if (!isVisible(key)) return 'rgba(0,0,0,0)'
+
+    if (photo()) {
+      // Wilayah yang dikesampingkan petunjuk digelapkan, bukan disembunyikan.
+      const spotlight = options.spotlightIds?.value
+      if (spotlight?.size && !spotlight.has(key)) return 'rgba(2, 6, 23, 0.55)'
+      if (hoverKey.value === key) return 'rgba(255, 255, 255, 0.3)'
+      return 'rgba(0, 0, 0, 0)'
+    }
 
     const base = flagFillFor(f.properties.iso_a2 ?? '')?.fill ?? fallbackCap()
     const spotlight = options.spotlightIds?.value
@@ -117,7 +171,8 @@ export function useGlobeMap(
 
   function altitudeFor(f: RegionFeature): number {
     const key = regionId(f)
-    if (marked.has(key) || hoverKey.value === key) return 0.02
+    if (marked.has(key)) return 0.03
+    if (hoverKey.value === key) return 0.02
     if (!isVisible(key)) return 0
     return 0.006
   }
@@ -125,13 +180,36 @@ export function useGlobeMap(
   function strokeColorFor(f: RegionFeature): string {
     const key = regionId(f)
     if (!isVisible(key) && !marked.has(key) && !heatById.has(key)) return 'rgba(0,0,0,0)'
+    if (photo()) return marked.has(key) ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)'
     return strokeColor()
+  }
+
+  /** Dinding samping wilayah yang ditandai ikut berwarna, supaya terlihat "terangkat". */
+  function sideColorFor(f: RegionFeature): string {
+    const mark = markKindById.get(regionId(f))
+    if (photo() && mark) return MARK_FILL[mark]
+    return photo() ? 'rgba(0,0,0,0)' : sideColor()
+  }
+
+  /**
+   * Cincin berdenyut di pusat wilayah yang ditandai. Negara kecil (UEA,
+   * Luksemburg, Singapura) cuma beberapa piksel di globe — tanpa cincin,
+   * pemain tidak akan tahu di mana jawaban yang benar muncul.
+   */
+  function updateRings() {
+    if (!globe) return
+    const rings = [...markKindById].flatMap(([id, kind]) => {
+      const c = centroidByKey.get(id)
+      return c ? [{ ...c, kind }] : []
+    })
+    globe.ringsData(rings)
   }
 
   /** Paksa globe mengolah ulang poligonnya (re-warna setelah state berubah). */
   function rerender() {
     if (!globe || !features.length) return
     globe.polygonsData([...features])
+    updateRings()
   }
 
   function distanceToTarget(id: string): number | undefined {
@@ -187,7 +265,22 @@ export function useGlobeMap(
         .polygonsTransitionDuration(0)
         .polygonAltitude((f: RegionFeature) => altitudeFor(f))
         .polygonCapColor((f: RegionFeature) => capColorFor(f))
-        .polygonSideColor(() => sideColor())
+        .polygonSideColor((f: RegionFeature) => sideColorFor(f))
+        .ringColor((r: { kind: MarkKind }) => {
+          const rgb = r.kind === 'correct' ? '16,185,129' : r.kind === 'wrong' ? '244,63,94' : '56,189,248'
+          return (t: number) => `rgba(${rgb},${(1 - t) * 0.9})`
+        })
+        .ringMaxRadius(4)
+        .ringPropagationSpeed(3)
+        .ringRepeatPeriod(900)
+        .globeImageUrl(EARTH_TEXTURE)
+        .onGlobeReady(() => {
+          // Ambil teksturnya dari material, lalu atur sendiri kapan dipakai.
+          photoTexture = globe?.globeMaterial().map ?? null
+          photoReady.value = Boolean(photoTexture)
+          applySurface()
+          rerender()
+        })
         .polygonStrokeColor((f: RegionFeature) => strokeColorFor(f))
         .showPointerCursor((type: string) => type === 'polygon')
         .onPolygonClick((polygon: object, event: MouseEvent) => {
@@ -209,7 +302,7 @@ export function useGlobeMap(
         .width(container.value.clientWidth || 800)
         .height(container.value.clientHeight || 600)
 
-      globe.globeMaterial().color.set(oceanColor())
+      applySurface()
 
       const controls = globe.controls()
       controls.autoRotate = false
@@ -315,7 +408,7 @@ export function useGlobeMap(
 
   watch([isDark, hardcore, () => options.soloTargetId?.value, () => options.activePoolIds?.value, () => options.spotlightIds?.value], () => {
     if (!ready.value || !globe) return
-    globe.globeMaterial().color.set(oceanColor())
+    applySurface()
     applyCameraLock()
     rerender()
   })
