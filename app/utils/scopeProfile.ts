@@ -1,4 +1,5 @@
 import type { DatasetScope } from '~/types/game'
+import { type CountryPack, type PackScope, packForScope } from '~/utils/countryPacks'
 
 /**
  * Profil per cakupan soal: satu tempat untuk semua yang dulu tersebar sebagai
@@ -87,7 +88,7 @@ const IT_BASE = { country: 'Italy', center: [42.5, 12.5] as [number, number], zo
  */
 const DE_BASE = { country: 'Germany', center: [51.1, 10.4] as [number, number], zoom: 5, minZoom: 4 }
 
-const PROFILES: Record<DatasetScope, ScopeProfile> = {
+const PROFILES: Record<Exclude<DatasetScope, PackScope>, ScopeProfile> = {
   'world': WORLD,
 
   'id-provinces': {
@@ -236,8 +237,26 @@ const PROFILES: Record<DatasetScope, ScopeProfile> = {
   },
 }
 
+/**
+ * Profil paket negara. Polanya sama dengan Italia & Jerman: koleksinya
+ * menutupi seluruh negara, kamera difit ke isi koleksi, dan daratan negara
+ * tetangga digambar sebagai patokan posisi.
+ */
+function packProfile(pack: CountryPack): ScopeProfile {
+  return {
+    country: pack.country,
+    ...pack.profile,
+    maxZoom: Math.max(11, pack.profile.fitRegionMaxZoom + 2),
+    local: true,
+    countryBackdrop: true,
+    fitPoolMaxZoom: 11,
+  }
+}
+
 export function scopeProfile(scope: string): ScopeProfile {
-  return PROFILES[scope as DatasetScope] ?? WORLD
+  const pack = packForScope(scope)
+  if (pack) return packProfile(pack)
+  return PROFILES[scope as Exclude<DatasetScope, PackScope>] ?? WORLD
 }
 
 /** Nama negara induk sebuah scope; `null` di cakupan dunia. */

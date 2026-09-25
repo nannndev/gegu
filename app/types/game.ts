@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import type { PackScope } from '~/utils/countryPacks'
 
 /**
  * Mode permainan. A = cari di peta, B = tebak nama dari outline,
@@ -18,6 +19,8 @@ export type DatasetScope =
   | 'jp-prefectures'
   | 'it-provinces'
   | 'de-states'
+  /** Paket negara (Prancis, Spanyol, …); lihat utils/countryPacks.ts. */
+  | PackScope
 
 /**
  * Tingkat kesulitan. `hardcore` melucuti semua petunjuk selain bentuk wilayah

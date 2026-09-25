@@ -6,6 +6,8 @@ import { loadStats, statsForScope, type StatsBlob } from '~/utils/stats'
 import { HARDCORE_SECONDS } from '~/stores/game'
 import { CHALLENGE_PARAM, decodeChallenge, type Challenge } from '~/utils/challenge'
 import { masterySummary, weakItems, type MasterySummary } from '~/utils/mastery'
+import { COUNTRY_PACKS, packForKey, packForScope } from '~/utils/countryPacks'
+import type { MessageKey } from '~/i18n/id'
 
 const {
   regions,
@@ -29,6 +31,7 @@ const game = useGameStore()
 const { soundEnabled, toggleSound, playClick } = useAudio()
 const setup = useGameSetup()
 const { t } = useI18n()
+const { packText } = useScopeLabel()
 
 const showRules = ref(false)
 
@@ -44,7 +47,10 @@ const SCOPE_ACCENT = {
   japan: { iso: 'JP', ambient: 'bg-ambient-japan' },
   italy: { iso: 'IT', ambient: 'bg-ambient-italy' },
   germany: { iso: 'DE', ambient: 'bg-ambient-germany' },
-} as const
+  // Paket negara memakai cahaya ambien netral; sorotan globe-nya sudah
+  // cukup menunjukkan negara mana yang dipilih.
+  ...Object.fromEntries(COUNTRY_PACKS.map(p => [p.key, { iso: p.iso, ambient: 'bg-ambient-glow' }])),
+} as Record<string, { iso: string | null, ambient: string }>
 
 /**
  * Data untuk scope chips — menggantikan 6 kartu besar yang terpisah.
@@ -58,7 +64,8 @@ const SCOPE_CHIPS = [
   { key: 'japan' as const, icon: '🇯🇵', accent: 'rose' },
   { key: 'italy' as const, icon: '🇮🇹', accent: 'emerald' },
   { key: 'germany' as const, icon: '🇩🇪', accent: 'red' },
-] as const
+  ...COUNTRY_PACKS.map(p => ({ key: p.key, icon: p.flag, accent: p.accent })),
+]
 
 /** Nama kunci i18n untuk judul & deskripsi tiap scope. */
 const SCOPE_I18N_MAP: Record<string, { title: string, desc: string }> = {
@@ -71,10 +78,27 @@ const SCOPE_I18N_MAP: Record<string, { title: string, desc: string }> = {
   germany: { title: 'setup.scope.de.title', desc: 'setup.scope.de.desc' },
 }
 
-const activeChip = computed(() => SCOPE_CHIPS.find(c => c.key === setup.primaryScope.value)!)
-const activeScopeI18n = computed(() => SCOPE_I18N_MAP[setup.primaryScope.value]!)
+/** Judul chip cakupan; paket negara merakitnya dari registry. */
+function scopeTitle(key: string): string {
+  const pack = packForKey(key)
+  if (pack) return packText(pack).country
+  return t(SCOPE_I18N_MAP[key]!.title as MessageKey)
+}
 
-const scopeAccent = computed(() => SCOPE_ACCENT[setup.primaryScope.value])
+/** Deskripsi cakupan di kartu bawah chip. */
+function scopeDesc(key: string): string {
+  const pack = packForKey(key)
+  if (!pack) return t(SCOPE_I18N_MAP[key]!.desc as MessageKey)
+  const unit = packText(pack).unit
+  const regionCount = new Set(items.value.map(i => i.region)).size
+  return regionCount > 1
+    ? t('pack.desc', { n: pack.count, unit, regions: regionCount })
+    : t('pack.descSingle', { n: pack.count, unit })
+}
+
+const activeChip = computed(() => SCOPE_CHIPS.find(c => c.key === setup.primaryScope.value)!)
+
+const scopeAccent = computed(() => SCOPE_ACCENT[setup.primaryScope.value] ?? SCOPE_ACCENT.world!)
 const backdropIso = computed(() => scopeAccent.value.iso)
 const ambientClass = computed(() => scopeAccent.value.ambient)
 const stats = ref<StatsBlob>({ overall: { bestScore: 0, bestStreak: 0, bestAccuracy: 0, gamesPlayed: 0 }, byScope: {} })
@@ -181,20 +205,32 @@ const REGION_FILTER_TEXT = {
  * cakupan lokal (kecamatan, county) sudah dipersempit lewat pemilih kota/state
  * miliknya sendiri, jadi tidak punya filter kedua.
  */
-const hasRegionFilter = computed(() =>
-  setup.activeScope.value in REGION_FILTER_TEXT,
-)
+const hasRegionFilter = computed(() => {
+  // Paket negara dengan satu region saja (Australia) tidak punya apa pun
+  // untuk disaring — filternya cuma akan berisi "semua".
+  if (packForScope(setup.activeScope.value)) return regions.value.length > 1
+  return setup.activeScope.value in REGION_FILTER_TEXT
+})
 
 const regionFilterText = computed(() =>
   REGION_FILTER_TEXT[setup.activeScope.value as keyof typeof REGION_FILTER_TEXT]
   ?? REGION_FILTER_TEXT.world,
 )
 
-const regionFilterLabel = computed(() => t(regionFilterText.value.label))
-const regionFilterPlaceholder = computed(() => t(regionFilterText.value.search))
+/** Paket negara aktif, kalau cakupan yang dipilih salah satunya. */
+const activePack = computed(() => packForScope(setup.activeScope.value))
+
+const regionFilterLabel = computed(() => activePack.value
+  ? t('pack.filter', { country: packText(activePack.value).country })
+  : t(regionFilterText.value.label))
+const regionFilterPlaceholder = computed(() => activePack.value
+  ? t('pack.filterSearch', { country: packText(activePack.value).country })
+  : t(regionFilterText.value.search))
 
 const regionFilterOptions = computed<SearchOption[]>(() => {
-  const allLabel = t(regionFilterText.value.all)
+  const allLabel = activePack.value
+    ? t('pack.filterAll', { n: activePack.value.count, unit: packText(activePack.value).unit })
+    : t(regionFilterText.value.all)
 
   return [
     {
@@ -585,6 +621,7 @@ onBeforeUnmount(() => {
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇯🇵 {{ t('home.chip.prefecture') }}</span>
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇹 {{ t('home.chip.provincia') }}</span>
             <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇩🇪 {{ t('home.chip.bundesland') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">{{ COUNTRY_PACKS.map(p => p.flag).join('') }} {{ t('home.chip.more', { n: COUNTRY_PACKS.length }) }}</span>
           </div>
         </div>
 
@@ -692,7 +729,7 @@ onBeforeUnmount(() => {
               @click="setup.setPrimaryScope(chip.key)"
             >
               <span class="scope-chip-icon" aria-hidden="true">{{ chip.icon }}</span>
-              <span class="scope-chip-label">{{ t(SCOPE_I18N_MAP[chip.key].title) }}</span>
+              <span class="scope-chip-label">{{ scopeTitle(chip.key) }}</span>
             </button>
           </div>
 
@@ -701,7 +738,7 @@ onBeforeUnmount(() => {
             <span class="text-lg" aria-hidden="true">{{ activeChip.icon }}</span>
             <div class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-2">
-                <span class="text-xs font-bold text-slate-900 dark:text-white">{{ t(activeScopeI18n.title) }}</span>
+                <span class="text-xs font-bold text-slate-900 dark:text-white">{{ scopeTitle(setup.primaryScope.value) }}</span>
                 <!--
                   Penguasaan juga dipasang di sini, bukan cuma di kartunya: di
                   ponsel kartu itu ada jauh di bawah, sementara baris ini
@@ -715,7 +752,7 @@ onBeforeUnmount(() => {
                   ⭐ {{ t('mastery.chip', { n: mastery.mastered, total: mastery.total }) }}
                 </a>
               </span>
-              <span class="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ t(activeScopeI18n.desc) }}</span>
+              <span class="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{{ scopeDesc(setup.primaryScope.value) }}</span>
             </div>
             <span class="hidden shrink-0 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400 sm:inline-flex">
               {{ t('setup.scope.poolReady', { n: setup.poolSize.value }) }}

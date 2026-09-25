@@ -1,11 +1,15 @@
 import type { ScopeParts } from '~/composables/useScopeLabel'
 import type { DatasetScope, Difficulty, GameMode, RegionItem, RegionLevel } from '~/types/game'
 import { HARDCORE_SECONDS, ROUND_SECONDS } from '~/stores/game'
+import { COUNTRY_PACKS, type PackKey, isPackScope, packForKey } from '~/utils/countryPacks'
 
-export type PrimaryScope = 'world' | 'indonesia' | 'us' | 'malaysia' | 'japan' | 'italy' | 'germany'
+export type PrimaryScope = 'world' | 'indonesia' | 'us' | 'malaysia' | 'japan' | 'italy' | 'germany' | PackKey
 
 /** Nilai `PrimaryScope` yang sah; dipakai saat memulihkan setup tersimpan. */
-const PRIMARY_SCOPES: PrimaryScope[] = ['world', 'indonesia', 'us', 'malaysia', 'japan', 'italy', 'germany']
+const PRIMARY_SCOPES: PrimaryScope[] = [
+  'world', 'indonesia', 'us', 'malaysia', 'japan', 'italy', 'germany',
+  ...COUNTRY_PACKS.map(p => p.key),
+]
 export type IndonesiaLevel = 'provinces' | 'kabupaten' | 'kecamatan' | 'mixed'
 export type UsLevel = 'states' | 'county'
 
@@ -70,6 +74,8 @@ export function useGameSetup() {
     if (primaryScope.value === 'japan') return 'jp-prefectures'
     if (primaryScope.value === 'italy') return 'it-provinces'
     if (primaryScope.value === 'germany') return 'de-states'
+    const pack = packForKey(primaryScope.value)
+    if (pack) return pack.scope
     if (primaryScope.value === 'us') {
       return usLevel.value === 'county' ? 'us-county' : 'us-states'
     }
@@ -126,6 +132,7 @@ export function useGameSetup() {
     if (s === 'jp-prefectures') return regionFilter.value === 'all' ? 'jp-prefectures' : `jp-prefectures:${regionFilter.value}`
     if (s === 'it-provinces') return regionFilter.value === 'all' ? 'it-provinces' : `it-provinces:${regionFilter.value}`
     if (s === 'de-states') return regionFilter.value === 'all' ? 'de-states' : `de-states:${regionFilter.value}`
+    if (isPackScope(s)) return regionFilter.value === 'all' ? s : `${s}:${regionFilter.value}`
     if (s === 'us-county') return `us-county:${geo.activeUsCountyState.value?.id ?? ''}`
     if (s === 'id-provinces') return 'id-provinces'
     if (s === 'id-kabupaten') return `id-kabupaten:${selectedProvince.value}`

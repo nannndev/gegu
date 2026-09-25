@@ -1,4 +1,5 @@
 import type { DatasetScope } from '~/types/game'
+import { type CountryPack, packForScope } from '~/utils/countryPacks'
 
 export type MixedPart = 'province' | 'kabupaten' | 'kecamatan'
 
@@ -23,7 +24,17 @@ export interface ScopeParts {
  * menampilkan bahasa yang dipakai saat tombol mulai ditekan.
  */
 export function useScopeLabel() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+
+  /** Teks paket negara dalam bahasa aktif. */
+  function packText(pack: CountryPack) {
+    return pack.text[locale.value]
+  }
+
+  /** Huruf besar di awal — "provinsi" → "Provinsi" untuk awal kalimat. */
+  function capitalize(s: string) {
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
 
   /** Buang awalan administratif supaya labelnya ringkas. */
   function shortCity(city: string) {
@@ -66,6 +77,13 @@ export function useScopeLabel() {
         ? t('scope.deStates')
         : t('scope.deStatesFiltered', { region: regionFilter })
     }
+    const pack = packForScope(scope)
+    if (pack) {
+      const txt = packText(pack)
+      return regionFilter === 'all'
+        ? t('pack.scope', { country: txt.country, n: pack.count, unit: txt.unit })
+        : t('pack.scopeFiltered', { country: txt.country, region: regionFilter })
+    }
     if (scope === 'id-provinces') {
       return regionFilter === 'all'
         ? t('scope.idProvinces')
@@ -99,11 +117,13 @@ export function useScopeLabel() {
     if (scope === 'jp-prefectures') return t('unit.prefecture')
     if (scope === 'it-provinces') return t('unit.provincia')
     if (scope === 'de-states') return t('unit.bundesland')
+    const pack = packForScope(scope)
+    if (pack) return packText(pack).unit
     if (scope === 'id-provinces') return t('unit.province')
     if (scope === 'id-kabupaten') return t('unit.kabupaten')
     if (scope === 'id-mixed') return t('unit.region')
     return t('unit.kecamatan')
   }
 
-  return { formatScope, unitFor, shortCity }
+  return { formatScope, unitFor, shortCity, packText, capitalize }
 }

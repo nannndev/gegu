@@ -2,6 +2,7 @@
 import { isoToFlag, getPerformanceRank } from '~/utils/geo'
 import { formatDistance } from '~/utils/distance'
 import { challengeUrl } from '~/utils/challenge'
+import { packForScope } from '~/utils/countryPacks'
 import type { RegionCollection, RoundResult } from '~/types/game'
 
 const game = useGameStore()
@@ -238,6 +239,8 @@ const columnHeader = computed(() => {
   if (game.datasetScope === 'jp-prefectures') return t('unit.prefecture')
   if (game.datasetScope === 'it-provinces') return t('unit.provincia')
   if (game.datasetScope === 'de-states') return t('unit.bundesland')
+  const pack = packForScope(game.datasetScope)
+  if (pack) return pack.text[locale.value].unit
   return t('unit.country')
 })
 
@@ -247,6 +250,8 @@ const columnHeader = computed(() => {
  */
 function rowFlag(iso?: string | null) {
   if (game.datasetScope === 'world') return isoToFlag(iso) || '🌐'
+  const pack = packForScope(game.datasetScope)
+  if (pack) return pack.flag
   if (game.datasetScope.startsWith('us')) return '🇺🇸'
   if (game.datasetScope.startsWith('my')) return '🇲🇾'
   if (game.datasetScope.startsWith('jp')) return '🇯🇵'

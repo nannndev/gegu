@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type { RegionItem } from '~/types/game'
 import { isoToFlag } from '~/utils/geo'
+import { packForScope } from '~/utils/countryPacks'
 
 const emit = defineEmits<{ answer: [item: RegionItem] }>()
 
 const game = useGameStore()
 const { t } = useI18n()
-const { formatScope, shortCity } = useScopeLabel()
+const { formatScope, shortCity, packText, capitalize } = useScopeLabel()
+
+/** Paket negara sesi ini, kalau cakupannya salah satu paket. */
+const activePack = computed(() => packForScope(game.datasetScope))
 const answered = computed(() => game.phase === 'answered')
 
 const hotkeys = ['A', 'B', 'C', 'D']
@@ -74,6 +78,7 @@ const challengeBadge = computed(() => {
   if (game.datasetScope === 'jp-prefectures') return t('prompt.badge.jpPrefectures')
   if (game.datasetScope === 'it-provinces') return t('prompt.badge.itProvinces')
   if (game.datasetScope === 'de-states') return t('prompt.badge.deStates')
+  if (activePack.value) return formatScope({ scope: game.datasetScope })
   return formatScope({
     scope: game.datasetScope,
     provinceName: game.provinceName,
@@ -109,9 +114,17 @@ const promptScope = computed(() => {
  * memasang bendera yang salah.
  */
 /** Warna titik berdenyut di bilah soal, mengikuti negara cakupannya. */
+const PACK_DOT: Record<string, string> = {
+  sky: 'bg-sky-500', rose: 'bg-rose-500', blue: 'bg-blue-500',
+  amber: 'bg-amber-500', emerald: 'bg-emerald-500', red: 'bg-red-500',
+}
+
 const scopeDotClass = computed(() => {
   if (game.isHardcore) return 'bg-rose-600'
   if (game.datasetScope === 'world') return 'bg-sky-500'
+  // Paket negara dicek sebelum rantai awalan di bawah: kodenya bebas
+  // (in-, ca-, …) dan bisa saja kebetulan berawalan sama dengan negara lain.
+  if (activePack.value) return PACK_DOT[activePack.value.accent]
   if (game.datasetScope.startsWith('us')) return 'bg-blue-500'
   if (game.datasetScope.startsWith('my')) return 'bg-amber-500'
   if (game.datasetScope.startsWith('jp')) return 'bg-rose-400'
@@ -125,6 +138,7 @@ const promptFlag = computed(() => {
   if (game.datasetScope === 'world') {
     return isoToFlag(game.currentTarget?.iso) || '🌐'
   }
+  if (activePack.value) return activePack.value.flag
   if (game.datasetScope.startsWith('us')) return '🇺🇸'
   if (game.datasetScope.startsWith('my')) return '🇲🇾'
   if (game.datasetScope.startsWith('jp')) return '🇯🇵'
@@ -144,6 +158,9 @@ const modeAInstruction = computed(() => {
   if (promptScope.value === 'jp-prefectures') return t('prompt.a.jpPrefectures', { name })
   if (promptScope.value === 'it-provinces') return t('prompt.a.itProvinces', { name })
   if (promptScope.value === 'de-states') return t('prompt.a.deStates', { name })
+  if (activePack.value) {
+    return t('pack.promptA', { name, country: packText(activePack.value).country })
+  }
   return t('prompt.a.world')
 })
 
@@ -168,6 +185,10 @@ const modeBQuestion = computed(() => {
   if (promptScope.value === 'jp-prefectures') return t('prompt.b.jpPrefectures')
   if (promptScope.value === 'it-provinces') return t('prompt.b.itProvinces')
   if (promptScope.value === 'de-states') return t('prompt.b.deStates')
+  if (activePack.value) {
+    const txt = packText(activePack.value)
+    return t('pack.promptB', { unitOne: capitalize(txt.unitOne), country: txt.country })
+  }
   if (promptScope.value === 'us-county') {
     return t('prompt.b.usCounty', {
       state: game.stateName || t('prompt.b.stateFallback'),
