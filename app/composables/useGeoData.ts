@@ -5,6 +5,7 @@ import type {
   RegionItem,
   RegionLevel,
 } from '~/types/game'
+import { type PackScope, isPackScope, packForScope } from '~/utils/countryPacks'
 
 export function regionId(feature: RegionFeature): string {
   return (feature.properties as { id?: string }).id ?? feature.properties.iso_a2 ?? feature.properties.name
@@ -65,7 +66,7 @@ interface KecamatanIndex {
  * baru dulu berarti menambah `|| scope === '…'` di kedua rantai itu, dan
  * melewatkan salah satunya membuat dataset dimuat sebagai level yang salah.
  */
-const LEVEL_BY_SCOPE: Record<DatasetScope, RegionLevel> = {
+const LEVEL_BY_SCOPE: Record<Exclude<DatasetScope, PackScope>, RegionLevel> = {
   'world': 'world',
   'id-provinces': 'province',
   'id-kabupaten': 'province',
@@ -80,7 +81,19 @@ const LEVEL_BY_SCOPE: Record<DatasetScope, RegionLevel> = {
 }
 
 function levelFor(scope: DatasetScope): RegionLevel {
+  if (isPackScope(scope)) return 'province'
   return LEVEL_BY_SCOPE[scope] ?? 'world'
+}
+
+/** Paket negara: satu file per negara, hanya yang dipilih yang diunduh. */
+const packFiles = import.meta.glob<{ default: RegionCollection }>(
+  '~/assets/data/packs/*.geo.json',
+)
+
+async function loadPack(file: string): Promise<RegionCollection> {
+  const entry = Object.entries(packFiles).find(([path]) => path.endsWith(`/${file}.geo.json`))
+  if (!entry) throw new Error(`Dataset paket negara tidak ada: ${file}`)
+  return (await entry[1]()).default
 }
 
 /** Cache per-set supaya GeoJSON hanya di-parse sekali per sesi. */
@@ -121,7 +134,11 @@ async function loadRegionSet(
   if (cached) return cached
 
   let data: RegionCollection
-  if (code === 'us-states') {
+  const pack = packForScope(code)
+  if (pack) {
+    data = await loadPack(pack.file)
+  }
+  else if (code === 'us-states') {
     data = (await import('~/assets/data/us-states.geo.json')).default as unknown as RegionCollection
   }
   else if (code === 'my-states') {

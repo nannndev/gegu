@@ -18,7 +18,7 @@ npm run generate   # static — siap deploy ke Vercel/Netlify/GitHub Pages
 - **Mode A — Cari di Peta:** nama wilayah ditampilkan, pemain mengklik lokasinya di peta.
 - **Mode B — Tebak Nama:** satu wilayah disorot dan peta auto-zoom ke situ, pemain memilih namanya dari 4 opsi.
 
-Cakupannya bisa dunia (175 negara), 38 provinsi, kab/kota satu provinsi, kecamatan satu kota, campuran multi-tingkat, 50 state AS beserta countynya, 16 negeri Malaysia, 47 prefektur Jepang, 110 provinsi Italia, atau 16 negara bagian Jerman. Panjang sesi 5–20 ronde tergantung besar pool. Benar `= 10 + (streak × 2)` poin; salah tidak mengurangi skor tapi memutus streak. Di Mode A, tebakan yang masih dalam radius cakupan dibayar sebagian (maksimal separuh poin penuh). Wilayah tidak berulang dalam satu sesi.
+Cakupannya bisa dunia (175 negara), 38 provinsi, kab/kota satu provinsi, kecamatan satu kota, campuran multi-tingkat, 50 state AS beserta countynya, 16 negeri Malaysia, 47 prefektur Jepang, 110 provinsi Italia, 16 negara bagian Jerman, atau salah satu dari 10 paket negara lain: Prancis, Spanyol, Tiongkok, India, Brasil, Kanada, Australia, Korea Selatan, Meksiko, dan Thailand. Panjang sesi 5–20 ronde tergantung besar pool. Benar `= 10 + (streak × 2)` poin; salah tidak mengurangi skor tapi memutus streak. Di Mode A, tebakan yang masih dalam radius cakupan dibayar sebagian (maksimal separuh poin penuh). Wilayah tidak berulang dalam satu sesi.
 
 **Tantangan harian** (`app/utils/daily.ts`) mengundi satu konfigurasi per tanggal lewat PRNG ber-seed, jadi semua pemain dapat soal yang sama di hari yang sama tanpa perlu server.
 
@@ -62,6 +62,15 @@ Script tersebut memangkas properti ke `name` / `name_id` / `iso_a2` / `region` /
 
 **Lisensi tiap dataset berbeda, dan itu menentukan sumbernya.** Direktori ini ikut dipublikasikan bersama aplikasi, jadi sumber yang melarang redistribusi tidak bisa dipakai untuk dataset baru. Kecamatan Indonesia memakai GADM dan **tidak** boleh diredistribusi ([`KECAMATAN.md`](app/assets/data/KECAMATAN.md)); county AS memakai US Census (public domain); negeri Malaysia, prefektur Jepang, provinsi Italia, dan negara bagian Jerman memakai Natural Earth (public domain, [`MALAYSIA.md`](app/assets/data/MALAYSIA.md) · [`JEPANG.md`](app/assets/data/JEPANG.md) · [`ITALIA.md`](app/assets/data/ITALIA.md) · [`DEUTSCHLAND.md`](app/assets/data/DEUTSCHLAND.md)). Untuk Malaysia, repo GeoJSON populer di GitHub sengaja dihindari — kebanyakan tanpa lisensi atau diam-diam turunan GADM.
 
+**Paket negara** (`app/assets/data/packs/`) juga Natural Earth 1:10m admin-1 (domain publik), dibangun oleh `scripts/build-packs.mjs`. Bedanya dengan skrip per negara: geometrinya disederhanakan (Douglas–Peucker) dan pulau mungil dibuang, karena sumber 1:10m sangat rapat — Jerman saja 1,8 MB, dan Kanada dengan pulau-pulau Arktiknya akan jadi belasan MB. Hasilnya 46–171 KB per negara. Menambah negara berikutnya cukup satu entri di skrip itu plus satu entri di `app/utils/countryPacks.ts`; semua label, bendera, profil kamera, dan filter region diturunkan dari registry itu.
+
+```bash
+curl -sL -o /tmp/ne1.geojson \
+  https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson
+node scripts/build-packs.mjs /tmp/ne1.geojson        # semua paket
+node scripts/build-packs.mjs /tmp/ne1.geojson fr es  # sebagian
+```
+
 **Tekstur globe** (`public/textures/earth-blue-marble.jpg`) adalah foto NASA Blue Marble (domain publik), diambil dari contoh paket `three-globe` (MIT) dan diperkecil ke 2048×1024 (~350 KB). Dipakai sebagai permukaan globe 3D saat bermain; mode hardcore tetap memakai bola polos karena foto satelit memperlihatkan garis pantai.
 
 ## Struktur
@@ -83,7 +92,7 @@ app/
                       us-states · us-county/ · my-states · jp-prefectures · it-provinces · de-states
 docs/                 PRD
 scripts/              build-geodata.mjs · build-us.mjs · build-my.mjs
-                      build-jp.mjs · build-it.mjs · build-de.mjs
+                      build-jp.mjs · build-it.mjs · build-de.mjs · build-packs.mjs
 ```
 
 ## Status
