@@ -62,6 +62,8 @@ Script tersebut memangkas properti ke `name` / `name_id` / `iso_a2` / `region` /
 
 **Lisensi tiap dataset berbeda, dan itu menentukan sumbernya.** Direktori ini ikut dipublikasikan bersama aplikasi, jadi sumber yang melarang redistribusi tidak bisa dipakai untuk dataset baru. Kecamatan Indonesia memakai GADM dan **tidak** boleh diredistribusi ([`KECAMATAN.md`](app/assets/data/KECAMATAN.md)); county AS memakai US Census (public domain); negeri Malaysia, prefektur Jepang, provinsi Italia, dan negara bagian Jerman memakai Natural Earth (public domain, [`MALAYSIA.md`](app/assets/data/MALAYSIA.md) · [`JEPANG.md`](app/assets/data/JEPANG.md) · [`ITALIA.md`](app/assets/data/ITALIA.md) · [`DEUTSCHLAND.md`](app/assets/data/DEUTSCHLAND.md)). Untuk Malaysia, repo GeoJSON populer di GitHub sengaja dihindari — kebanyakan tanpa lisensi atau diam-diam turunan GADM.
 
+**Tekstur globe** (`public/textures/earth-blue-marble.jpg`) adalah foto NASA Blue Marble (domain publik), diambil dari contoh paket `three-globe` (MIT) dan diperkecil ke 2048×1024 (~350 KB). Dipakai sebagai permukaan globe 3D saat bermain; mode hardcore tetap memakai bola polos karena foto satelit memperlihatkan garis pantai.
+
 ## Struktur
 
 ```
