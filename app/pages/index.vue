@@ -98,6 +98,90 @@ function scopeDesc(key: string): string {
 
 const activeChip = computed(() => SCOPE_CHIPS.find(c => c.key === setup.primaryScope.value)!)
 
+// ── Pemilih cakupan ringkas ───────────────────────────────────
+/**
+ * Dengan 17 cakupan, deretan chip lengkap memakan sembilan baris di ponsel
+ * dan mendorong pilihan mode dua layar ke bawah. Jadi yang tampil sebagai
+ * chip cuma lima — dunia, Indonesia, dan tiga negara yang terakhir dipilih —
+ * sisanya lewat dropdown "Negara lain" yang bisa dicari dan dikelompokkan
+ * per benua. Jumlah chip tetap lima berapa pun negara yang ditambahkan.
+ */
+type ScopeKey = (typeof SCOPE_CHIPS)[number]['key']
+const PINNED: ScopeKey[] = ['world', 'indonesia']
+/** Pengisi saat pemain belum pernah memilih negara lain. */
+const DEFAULT_RECENT: ScopeKey[] = ['us', 'japan', 'malaysia']
+const RECENT_KEY = 'geoguess_recent_scopes'
+const RECENT_MAX = 3
+
+const CONTINENT: Record<string, 'asia' | 'europe' | 'americas' | 'oceania'> = {
+  indonesia: 'asia', malaysia: 'asia', japan: 'asia', china: 'asia', india: 'asia', korea: 'asia', thailand: 'asia',
+  italy: 'europe', germany: 'europe', france: 'europe', spain: 'europe',
+  us: 'americas', canada: 'americas', mexico: 'americas', brazil: 'americas',
+  australia: 'oceania',
+}
+
+const recentScopes = ref<ScopeKey[]>([])
+
+function loadRecent() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
+    const valid = new Set(SCOPE_CHIPS.map(c => c.key))
+    recentScopes.value = (Array.isArray(raw) ? raw : []).filter((k): k is ScopeKey => valid.has(k))
+  }
+  catch {
+    recentScopes.value = []
+  }
+}
+
+function rememberScope(key: ScopeKey) {
+  if (PINNED.includes(key)) return
+  recentScopes.value = [key, ...recentScopes.value.filter(k => k !== key)].slice(0, RECENT_MAX)
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentScopes.value))
+  }
+  catch {}
+}
+
+const visibleChips = computed(() => {
+  const keys: ScopeKey[] = [...PINNED]
+  for (const k of [...recentScopes.value, ...DEFAULT_RECENT]) {
+    if (keys.length >= PINNED.length + RECENT_MAX) break
+    if (!keys.includes(k)) keys.push(k)
+  }
+  // Cakupan terpilih selalu terlihat sebagai chip, walau datang dari
+  // setup tersimpan atau tautan tantangan yang belum masuk daftar terakhir.
+  const current = setup.primaryScope.value as ScopeKey
+  if (!keys.includes(current)) keys[keys.length - 1] = current
+  return keys.map(k => SCOPE_CHIPS.find(c => c.key === k)!)
+})
+
+/** Semua negara (kecuali dunia), dikelompokkan per benua. */
+const moreScopeOptions = computed<SearchOption[]>(() =>
+  SCOPE_CHIPS
+    .filter(c => c.key !== 'world')
+    .map((c) => {
+      const pack = packForKey(c.key)
+      return {
+        value: c.key,
+        label: `${c.icon}  ${scopeTitle(c.key)}`,
+        hint: pack ? `${pack.count} ${packText(pack).unit}` : undefined,
+        group: t(`setup.scope.group.${CONTINENT[c.key] ?? 'asia'}` as MessageKey),
+      }
+    })
+    .sort((a, b) => a.group!.localeCompare(b.group!)),
+)
+
+/** Nilai dropdown: kosong kalau cakupan terpilih sudah tampil sebagai chip. */
+const moreScopeValue = computed(() =>
+  visibleChips.value.some(c => c.key === setup.primaryScope.value) ? '' : setup.primaryScope.value,
+)
+
+async function pickScope(key: string) {
+  if (!key) return
+  rememberScope(key as ScopeKey)
+  await setup.setPrimaryScope(key as ScopeKey)
+}
+
 const scopeAccent = computed(() => SCOPE_ACCENT[setup.primaryScope.value] ?? SCOPE_ACCENT.world!)
 const backdropIso = computed(() => scopeAccent.value.iso)
 const ambientClass = computed(() => scopeAccent.value.ambient)
@@ -474,6 +558,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  loadRecent()
   stats.value = loadStats()
   dailyDone.value = dailyResult(daily.key)
   const fromChallenge = await openChallenge()
@@ -613,15 +698,14 @@ onBeforeUnmount(() => {
           </p>
 
           <div class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[11px]">
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🌍 {{ t('home.chip.countries') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇩 {{ t('home.chip.districts') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇺🇸 {{ t('home.chip.states') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🏘️ {{ t('home.chip.counties') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇲🇾 {{ t('home.chip.negeri') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇯🇵 {{ t('home.chip.prefecture') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇮🇹 {{ t('home.chip.provincia') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🇩🇪 {{ t('home.chip.bundesland') }}</span>
-            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">{{ COUNTRY_PACKS.map(p => p.flag).join('') }} {{ t('home.chip.more', { n: COUNTRY_PACKS.length }) }}</span>
+            <!--
+              Satu baris ringkasan, bukan satu badge per dataset: dengan 17
+              cakupan, badge per dataset jadi enam baris di ponsel yang tidak
+              bisa diklik, dan daftarnya sudah ada di pemilih cakupan.
+            -->
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🌍 {{ t('home.chip.worldCountries') }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">🗺️ {{ t('home.chip.countryMaps', { n: SCOPE_CHIPS.length - 1 }) }}</span>
+            <span class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 px-2.5 py-1 text-slate-700 dark:text-slate-300 shadow-sm">📍 {{ t('home.chip.regions') }}</span>
           </div>
         </div>
 
@@ -718,7 +802,7 @@ onBeforeUnmount(() => {
           <!-- Scope chips — deretan horizontal ringkas -->
           <div class="flex flex-wrap gap-2" role="radiogroup" :aria-label="t('setup.scope.group')">
             <button
-              v-for="chip in SCOPE_CHIPS"
+              v-for="chip in visibleChips"
               :key="chip.key"
               type="button"
               role="radio"
@@ -731,6 +815,17 @@ onBeforeUnmount(() => {
               <span class="scope-chip-icon" aria-hidden="true">{{ chip.icon }}</span>
               <span class="scope-chip-label">{{ scopeTitle(chip.key) }}</span>
             </button>
+            <div class="w-full sm:w-56">
+              <SearchSelect
+                :model-value="moreScopeValue"
+                :options="moreScopeOptions"
+                :label="t('setup.scope.more')"
+                :placeholder="`🌍  ${t('setup.scope.more')}`"
+                :search-placeholder="t('setup.scope.moreSearch')"
+                :search-threshold="0"
+                @update:model-value="pickScope"
+              />
+            </div>
           </div>
 
           <!-- Deskripsi scope terpilih + pool count -->
