@@ -493,6 +493,8 @@ export const id = {
   'result.challenge.shareDesc': 'Tautan dengan soal yang sama persis',
   'result.copyDesc': 'Teks skor + kotak hasil untuk chat',
   'mastery.chip': '{n}/{total} hafal',
+  'journey.title': 'Rute sesi ini',
+  'journey.hint': 'Tiap titik satu ronde, disambung sesuai urutan. Geser untuk memutar.',
 } as const
 
 export type MessageKey = keyof typeof id
