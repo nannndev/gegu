@@ -91,6 +91,14 @@ export const id = {
   'daily.done': 'Sudah kamu tuntasin — {score} poin ({accuracy}%)',
   'daily.play': 'Gas, mainkan sekarang',
   'daily.replay': 'Coba lagi, siapa tahu lebih tinggi',
+  'daily.streak': '{n} hari berturut-turut',
+  'daily.streakBest': 'Rekor {n} hari',
+  'daily.streakAtRisk': 'Main hari ini biar streak-nya nggak putus',
+  'daily.streakStart': 'Main tiap hari untuk bikin streak',
+  'daily.weekAria': 'Tantangan tujuh hari terakhir',
+  'daily.dayPlayed': '{day}: dimainkan, akurasi {accuracy}%',
+  'daily.dayMissed': '{day}: tidak dimainkan',
+  'result.share.dailyStreak': '🔥 Streak harian: {n} hari',
   'daily.badge': 'Harian {key}',
 
   // ── Home: langkah 1, wilayah ────────────────────────────────

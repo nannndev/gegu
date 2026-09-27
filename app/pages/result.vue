@@ -3,6 +3,7 @@ import { isoToFlag, getPerformanceRank } from '~/utils/geo'
 import { formatDistance } from '~/utils/distance'
 import { challengeUrl } from '~/utils/challenge'
 import { packForScope } from '~/utils/countryPacks'
+import { dailyStreak } from '~/utils/daily'
 import type { RegionCollection, RoundResult } from '~/types/game'
 
 const game = useGameStore()
@@ -268,6 +269,12 @@ const resultSquares = computed(() =>
   game.history.map(h => (h.correct ? '🟩' : '🟥')).join(''),
 )
 
+/**
+ * Streak harian setelah sesi ini. Hasilnya sudah disimpan store saat sesi
+ * selesai, jadi hari ini sudah ikut terhitung di sini.
+ */
+const dailyStreakDays = computed(() => (game.dailyKey ? dailyStreak(game.dailyKey).current : 0))
+
 async function shareResults() {
   playClick()
   const modeName = game.mode === 'A' ? t('setup.mode.a.short') : t('setup.mode.b.short')
@@ -276,6 +283,7 @@ async function shareResults() {
       ? t('result.share.daily', { key: game.dailyKey })
       : t('result.share.title'),
     rank.value.title,
+    dailyStreakDays.value > 1 ? t('result.share.dailyStreak', { n: dailyStreakDays.value }) : '',
     resultSquares.value,
     t('result.share.score', { score: game.score, accuracy: game.accuracy }),
     t('result.share.correct', {
@@ -331,6 +339,12 @@ async function shareResults() {
                 class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400"
               >
                 🎯 {{ t('daily.badge', { key: game.dailyKey }) }}
+              </span>
+              <span
+                v-if="dailyStreakDays > 0"
+                class="rounded-full border border-orange-500/40 bg-orange-500/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-orange-600 dark:text-orange-400"
+              >
+                🔥 {{ t('daily.streak', { n: dailyStreakDays }) }}
               </span>
               <span
                 v-if="game.isHardcore"

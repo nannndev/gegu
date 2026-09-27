@@ -57,31 +57,119 @@ export function dailyChallenge(key = todayKey()): DailyChallenge {
   return { key, kind, mode, rounds, timer }
 }
 
-const DONE_KEY = 'geoguess_daily_done'
+/**
+ * Riwayat tantangan harian: satu entri per tanggal.
+ *
+ * Versi pertama cuma menyimpan satu rekor (`geoguess_daily_done`) yang
+ * ditimpa setiap hari — pemain yang sudah main 30 hari berturut-turut tidak
+ * punya jejak apa pun. Riwayat ini yang membuat streak bisa dihitung.
+ */
+const HISTORY_KEY = 'geoguess_daily_history_v1'
+/** Kunci lama; dibaca sekali saat migrasi supaya hari itu tidak hilang. */
+const LEGACY_DONE_KEY = 'geoguess_daily_done'
+/** Batas entri: setahun lebih sedikit sudah cukup untuk rekor streak mana pun yang realistis. */
+const HISTORY_MAX = 400
 
-interface DailyRecord {
+export interface DailyRecord {
   key: string
   score: number
   accuracy: number
 }
 
-export function dailyResult(key = todayKey()): DailyRecord | null {
-  if (!import.meta.client) return null
+type DailyHistory = Record<string, { score: number, accuracy: number }>
+
+function loadHistory(): DailyHistory {
+  if (!import.meta.client) return {}
   try {
-    const raw = localStorage.getItem(DONE_KEY)
-    if (!raw) return null
-    const rec = JSON.parse(raw) as DailyRecord
-    return rec.key === key ? rec : null
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const history: DailyHistory = raw ? JSON.parse(raw) : {}
+    const legacy = localStorage.getItem(LEGACY_DONE_KEY)
+    if (legacy) {
+      const rec = JSON.parse(legacy) as DailyRecord
+      if (rec?.key && !history[rec.key]) history[rec.key] = { score: rec.score, accuracy: rec.accuracy }
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+      localStorage.removeItem(LEGACY_DONE_KEY)
+    }
+    return history
   }
   catch {
-    return null
+    return {}
   }
 }
 
+export function dailyResult(key = todayKey()): DailyRecord | null {
+  const rec = loadHistory()[key]
+  return rec ? { key, ...rec } : null
+}
+
+/**
+ * Simpan hasil hari itu. "Coba lagi" di hari yang sama boleh, tapi yang
+ * tersimpan skor terbaiknya — main ulang tidak boleh menurunkan hasil hari
+ * yang sudah bagus.
+ */
 export function saveDailyResult(rec: DailyRecord) {
   if (!import.meta.client) return
   try {
-    localStorage.setItem(DONE_KEY, JSON.stringify(rec))
+    const history = loadHistory()
+    const prev = history[rec.key]
+    if (!prev || rec.score > prev.score) history[rec.key] = { score: rec.score, accuracy: rec.accuracy }
+    const keys = Object.keys(history).sort()
+    for (const old of keys.slice(0, Math.max(0, keys.length - HISTORY_MAX))) delete history[old]
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
   }
   catch {}
+}
+
+/** Kunci hari sebelumnya/sesudahnya, dihitung di kalender lokal. */
+function shiftKey(key: string, days: number): string {
+  const [y, m, d] = key.split('-').map(Number)
+  return todayKey(new Date(y!, m! - 1, d! + days))
+}
+
+export interface DailyDay {
+  key: string
+  played: boolean
+  accuracy: number | null
+  isToday: boolean
+}
+
+export interface DailyStreak {
+  /** Hari berturut-turut sampai hari ini (atau kemarin, kalau hari ini belum main). */
+  current: number
+  best: number
+  playedToday: boolean
+  /** Streak masih hidup tapi hari ini belum dimainkan — besok sudah putus. */
+  atRisk: boolean
+  /** Tujuh hari terakhir, paling lama di kiri. */
+  week: DailyDay[]
+}
+
+/**
+ * Streak harian. Hari ini yang belum dimainkan tidak memutus streak — pemain
+ * masih punya sisa hari untuk menyambungnya — jadi hitungannya mundur dari
+ * kemarin dalam kasus itu.
+ */
+export function dailyStreak(today = todayKey()): DailyStreak {
+  const history = loadHistory()
+  const playedToday = Boolean(history[today])
+
+  let current = 0
+  for (let key = playedToday ? today : shiftKey(today, -1); history[key]; key = shiftKey(key, -1)) current++
+
+  let best = 0
+  let run = 0
+  let prev: string | null = null
+  for (const key of Object.keys(history).sort()) {
+    run = prev && shiftKey(prev, 1) === key ? run + 1 : 1
+    best = Math.max(best, run)
+    prev = key
+  }
+
+  const week: DailyDay[] = []
+  for (let i = 6; i >= 0; i--) {
+    const key = shiftKey(today, -i)
+    week.push({ key, played: Boolean(history[key]), accuracy: history[key]?.accuracy ?? null, isToday: i === 0 })
+  }
+
+  return { current, best, playedToday, atRisk: !playedToday && current > 0, week }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SearchOption } from '~/components/SearchSelect.vue'
 import type { GameMode, RegionItem } from '~/types/game'
-import { dailyChallenge, dailyResult } from '~/utils/daily'
+import { type DailyStreak, dailyChallenge, dailyResult, dailyStreak } from '~/utils/daily'
 import { loadStats, statsForScope, type StatsBlob } from '~/utils/stats'
 import { HARDCORE_SECONDS } from '~/stores/game'
 import { CHALLENGE_PARAM, decodeChallenge, type Challenge } from '~/utils/challenge'
@@ -30,7 +30,7 @@ const {
 const game = useGameStore()
 const { soundEnabled, toggleSound, playClick } = useAudio()
 const setup = useGameSetup()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { packText } = useScopeLabel()
 
 const showRules = ref(false)
@@ -391,6 +391,21 @@ const canStart = computed(() =>
 // ── Tantangan harian ──────────────────────────────────────────
 const daily = dailyChallenge()
 const dailyDone = ref<ReturnType<typeof dailyResult>>(null)
+/** Dibaca di onMounted — localStorage tidak ada saat render server. */
+const streak = ref<DailyStreak | null>(null)
+
+/** Huruf hari ("S", "M", …) sesuai bahasa aktif, untuk deret tujuh hari. */
+function dayLetter(key: string) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale.value === 'id' ? 'id-ID' : 'en-US', { weekday: 'narrow' })
+    .format(new Date(y!, m! - 1, d!))
+}
+
+function dayLabel(key: string) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale.value === 'id' ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'short' })
+    .format(new Date(y!, m! - 1, d!))
+}
 
 /** Nama cakupan singkat di kartu harian; ikut bahasa aktif. */
 const dailyScopeLabel = computed(() => {
@@ -561,6 +576,7 @@ onMounted(async () => {
   loadRecent()
   stats.value = loadStats()
   dailyDone.value = dailyResult(daily.key)
+  streak.value = dailyStreak(daily.key)
   const fromChallenge = await openChallenge()
   if (!fromChallenge) await setup.restore()
   refreshMastery()
@@ -751,6 +767,43 @@ onBeforeUnmount(() => {
               </dd>
             </div>
           </dl>
+
+          <!--
+            Streak + tujuh hari terakhir. Tujuannya satu: memberi alasan untuk
+            kembali besok. Kotak hari ini diberi garis, supaya "belum main
+            hari ini" terbaca tanpa harus membaca teksnya.
+          -->
+          <div v-if="streak" class="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-slate-950/40 px-3 py-2.5">
+            <div class="min-w-0">
+              <p v-if="streak.current" class="flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-white">
+                <span aria-hidden="true" :class="streak.atRisk ? 'opacity-50 grayscale' : ''">🔥</span>
+                {{ t('daily.streak', { n: streak.current }) }}
+              </p>
+              <p class="text-[11px] leading-snug" :class="streak.atRisk ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'">
+                <template v-if="streak.atRisk">{{ t('daily.streakAtRisk') }}</template>
+                <template v-else-if="!streak.current">🔥 {{ t('daily.streakStart') }}</template>
+                <template v-else-if="streak.best > streak.current">{{ t('daily.streakBest', { n: streak.best }) }}</template>
+              </p>
+            </div>
+            <ol class="flex shrink-0 gap-1" :aria-label="t('daily.weekAria')">
+              <li
+                v-for="day in streak.week"
+                :key="day.key"
+                class="flex flex-col items-center gap-0.5"
+                :title="day.played ? t('daily.dayPlayed', { day: dayLabel(day.key), accuracy: day.accuracy ?? 0 }) : t('daily.dayMissed', { day: dayLabel(day.key) })"
+              >
+                <span
+                  class="block h-5 w-5 rounded-md"
+                  :class="[
+                    day.played ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800',
+                    day.isToday ? 'ring-2 ring-amber-500/70 ring-offset-1 ring-offset-white dark:ring-offset-slate-900' : '',
+                  ]"
+                  :aria-label="day.played ? t('daily.dayPlayed', { day: dayLabel(day.key), accuracy: day.accuracy ?? 0 }) : t('daily.dayMissed', { day: dayLabel(day.key) })"
+                />
+                <span class="text-[9px] font-semibold uppercase text-slate-400" aria-hidden="true">{{ dayLetter(day.key) }}</span>
+              </li>
+            </ol>
+          </div>
 
           <div v-if="dailyDone" class="mt-4 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
             <span aria-hidden="true">✓</span>
