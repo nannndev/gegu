@@ -93,6 +93,14 @@ export const en: Record<MessageKey, string> = {
   'daily.done': 'You finished it — {score} points ({accuracy}%)',
   'daily.play': "Play today's run",
   'daily.replay': 'Run it again, go beat your score',
+  'daily.streak': '{n}-day streak',
+  'daily.streakBest': 'Best {n} days',
+  'daily.streakAtRisk': 'Play today to keep your streak alive',
+  'daily.streakStart': 'Play every day to build a streak',
+  'daily.weekAria': 'Daily challenges, last seven days',
+  'daily.dayPlayed': '{day}: played, {accuracy}% accuracy',
+  'daily.dayMissed': '{day}: not played',
+  'result.share.dailyStreak': '🔥 Daily streak: {n} days',
   'daily.badge': 'Daily {key}',
 
   // ── Home: step 1, area ──────────────────────────────────────
